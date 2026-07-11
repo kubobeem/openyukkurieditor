@@ -10,10 +10,12 @@ interface TimelineProps {
   onMoveItem: (trackIndex: number, itemId: string, newStartFrame: number) => void
   isPlaying: boolean
   snapFrames: number
+  markers: number[]
   selectedItemId: string | null
   onSelectItem: (trackIndex: number, itemId: string | null) => void
   onToggleTrackMute: (trackIndex: number) => void
   onToggleTrackLock: (trackIndex: number) => void
+  onToggleTrackSolo: (trackIndex: number) => void
 }
 
 const DEFAULT_SCALE = 8
@@ -52,10 +54,12 @@ export default function Timeline({
   onMoveItem,
   isPlaying,
   snapFrames,
+  markers,
   selectedItemId,
   onSelectItem,
   onToggleTrackMute,
   onToggleTrackLock,
+  onToggleTrackSolo,
 }: TimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rulerRef = useRef<HTMLCanvasElement>(null)
@@ -175,7 +179,24 @@ export default function Timeline({
         ctx.stroke()
       }
     }
-  }, [project.settings.fps, project.settings.totalFrames, scale, scrollLeft])
+
+    // Markers on ruler
+    if (markers.length > 0) {
+      markers.forEach(mf => {
+        const mx = mf * scale - scrollLeft
+        if (mx < -4 || mx > width + 4) return
+        // Small diamond marker at the top
+        ctx.fillStyle = '#ffcc44'
+        ctx.beginPath()
+        ctx.moveTo(mx, 4)
+        ctx.lineTo(mx + 4, 10)
+        ctx.lineTo(mx, 16)
+        ctx.lineTo(mx - 4, 10)
+        ctx.closePath()
+        ctx.fill()
+      })
+    }
+  }, [project.settings.fps, project.settings.totalFrames, scale, scrollLeft, markers])
 
   const drawTimeline = useCallback(() => {
     const canvas = canvasRef.current
@@ -221,6 +242,12 @@ export default function Timeline({
       ctx.moveTo(0, y + TRACK_HEIGHT - 0.5)
       ctx.lineTo(cw, y + TRACK_HEIGHT - 0.5)
       ctx.stroke()
+
+      // Locked track overlay (drawn once per track, not per clip)
+      if (track.locked) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.04)'
+        ctx.fillRect(0, y, cw, TRACK_HEIGHT)
+      }
 
       // Clips
       track.items.forEach(item => {
@@ -283,6 +310,22 @@ export default function Timeline({
       })
     })
 
+    // Marker lines on timeline
+    if (markers.length > 0) {
+      markers.forEach(mf => {
+        const mx = mf * scale - scrollLeft
+        if (mx < 0 || mx > cw) return
+        ctx.strokeStyle = 'rgba(255, 204, 68, 0.3)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([3, 3])
+        ctx.beginPath()
+        ctx.moveTo(mx, 0)
+        ctx.lineTo(mx, ch)
+        ctx.stroke()
+        ctx.setLineDash([])
+      })
+    }
+
     // Playhead
     const phX = currentFrame * scale - scrollLeft
     if (phX >= 0 && phX <= cw) {
@@ -306,7 +349,7 @@ export default function Timeline({
       ctx.textAlign = 'center'
       ctx.fillText(`f${currentFrame}`, phX, ch - 6)
     }
-  }, [project, currentFrame, scale, scrollLeft, hoveredTrackIndex, selectedItemId])
+  }, [project, currentFrame, scale, scrollLeft, markers, hoveredTrackIndex, selectedItemId])
 
   // Redraw using requestAnimationFrame
   const scheduleDraw = useCallback(() => {
@@ -550,6 +593,16 @@ export default function Timeline({
                   }}
                 >
                   {track.locked ? '🔒' : '🔓'}
+                </button>
+                <button
+                  className={`track-btn ${track.solo ? 'active' : ''}`}
+                  title={track.solo ? 'ソロ解除' : 'ソロ'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleTrackSolo(index)
+                  }}
+                >
+                  {track.solo ? '🎤' : '🎶'}
                 </button>
               </div>
             </div>
