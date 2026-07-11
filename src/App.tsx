@@ -12,6 +12,7 @@ import MenuBar from './components/MenuBar'
 import type { MenuGroup } from './components/MenuBar'
 import LeftPanel from './components/LeftPanel'
 import ItemPropertiesPanel from './components/ItemPropertiesPanel'
+import PreviewCanvas from './components/PreviewCanvas'
 import SerifInput from './components/SerifInput'
 import SettingsDialog from './components/SettingsDialog'
 import ExportDialog from './components/ExportDialog'
@@ -783,12 +784,11 @@ export default function App() {
         {/* 中央（プレビュー + セリフ入力） */}
         <div className="ymm4-center-area">
           <div className="ymm4-preview-area">
-            <div className="ymm4-preview-frame">
-              <span className="ymm4-preview-label">
-                {project.settings.width} × {project.settings.height}
-              </span>
-              <span className="ymm4-preview-time">{timeStr}</span>
-            </div>
+            <PreviewCanvas
+              project={project}
+              currentFrame={currentFrame}
+              selectedItemId={selectedClip?.itemId ?? null}
+            />
           </div>
 
           {/* セリフ入力 */}
