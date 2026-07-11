@@ -54,6 +54,8 @@ export interface TimelineItem {
   text?: string
   voicePreset?: string
   color?: string
+  appearAnimation?: string
+  disappearAnimation?: string
 }
 
 /** トラック */

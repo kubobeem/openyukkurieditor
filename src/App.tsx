@@ -173,6 +173,18 @@ export default function App() {
   }, [clearHistory])
 
   // --- クリップ操作 ---
+  const handleTrimItem = useCallback((trackIndex: number, itemId: string, newStartFrame: number, newEndFrame: number) => {
+    applyProjectUpdate(prev => ({
+      ...prev,
+      tracks: prev.tracks.map((track, i) => i !== trackIndex || track.locked ? track : {
+        ...track,
+        items: track.items.map(item => item.id === itemId ? {
+          ...item, startFrame: newStartFrame, endFrame: newEndFrame,
+        } : item),
+      }),
+    }))
+  }, [applyProjectUpdate])
+
   const handleMoveItem = useCallback((trackIndex: number, itemId: string, newStartFrame: number) => {
     applyProjectUpdate(prev => ({
       ...prev,
@@ -662,6 +674,7 @@ export default function App() {
               onFrameChange={handleFrameChange}
               onAddClip={handleAddClip}
               onMoveItem={handleMoveItem}
+              onTrimItem={handleTrimItem}
               isPlaying={isPlaying}
               snapFrames={snapFrames}
               markers={markers}

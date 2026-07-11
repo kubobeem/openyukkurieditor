@@ -8,6 +8,7 @@ interface TimelineProps {
   onFrameChange: (frame: number) => void
   onAddClip: (trackIndex: number) => void
   onMoveItem: (trackIndex: number, itemId: string, newStartFrame: number) => void
+  onTrimItem?: (trackIndex: number, itemId: string, newStartFrame: number, newEndFrame: number) => void
   isPlaying: boolean
   snapFrames: number
   markers: number[]
@@ -52,6 +53,7 @@ export default function Timeline({
   onFrameChange,
   onAddClip,
   onMoveItem,
+  onTrimItem,
   isPlaying,
   snapFrames,
   markers,
@@ -77,7 +79,8 @@ export default function Timeline({
     trackIndex: number
     startX: number
     startFrame: number
-  }>({ active: false, itemId: null, trackIndex: -1, startX: 0, startFrame: 0 })
+    mode: 'move' | 'trim-start' | 'trim-end'
+  }>({ active: false, itemId: null, trackIndex: -1, startX: 0, startFrame: 0, mode: 'move' })
   const justDraggedRef = useRef(false)
 
   const totalWidth = project.settings.totalFrames * scale
@@ -408,20 +411,34 @@ export default function Timeline({
     const track = project.tracks[drag.trackIndex]
     if (!track || track.locked) return
 
-    // Calculate new position from the last known mouse position
-    const deltaFrames = Math.round((mouseXRef.current - drag.startX) / scale)
-    // Compute clip duration for max-bound
     const draggedItem = project.tracks[drag.trackIndex]?.items.find(i => i.id === drag.itemId)
     if (!draggedItem) return
-    const itemDuration = draggedItem.endFrame - draggedItem.startFrame
-    const maxStart = Math.max(0, project.settings.totalFrames - itemDuration)
-    const rawStart = drag.startFrame + deltaFrames
-    const snappedStart = snapFrames > 1 ? Math.round(rawStart / snapFrames) * snapFrames : rawStart
-    const newStart = Math.max(0, Math.min(maxStart, snappedStart))
-    if (newStart !== drag.startFrame) {
-      onMoveItem(drag.trackIndex, drag.itemId, newStart)
+
+    const deltaFrames = Math.round((mouseXRef.current - drag.startX) / scale)
+    const snappedDelta = snapFrames > 1 ? Math.round(deltaFrames / snapFrames) * snapFrames : deltaFrames
+
+    if (drag.mode === 'move') {
+      const itemDuration = draggedItem.endFrame - draggedItem.startFrame
+      const maxStart = Math.max(0, project.settings.totalFrames - itemDuration)
+      const rawStart = drag.startFrame + snappedDelta
+      const newStart = Math.max(0, Math.min(maxStart, rawStart))
+      if (newStart !== drag.startFrame) {
+        onMoveItem(drag.trackIndex, drag.itemId, newStart)
+      }
+    } else if (drag.mode === 'trim-start' && onTrimItem) {
+      const rawStart = drag.startFrame + snappedDelta
+      const newStart = Math.max(0, Math.min(rawStart, draggedItem.endFrame - 1))
+      if (newStart !== drag.startFrame) {
+        onTrimItem(drag.trackIndex, drag.itemId, newStart, draggedItem.endFrame)
+      }
+    } else if (drag.mode === 'trim-end' && onTrimItem) {
+      const rawEnd = draggedItem.endFrame + snappedDelta
+      const newEnd = Math.min(project.settings.totalFrames, Math.max(rawEnd, draggedItem.startFrame + 1))
+      if (newEnd !== draggedItem.endFrame) {
+        onTrimItem(drag.trackIndex, drag.itemId, draggedItem.startFrame, newEnd)
+      }
     }
-  }, [scale, snapFrames, onMoveItem, project.tracks, project.settings.totalFrames])
+  }, [scale, snapFrames, onMoveItem, onTrimItem, project.tracks, project.settings.totalFrames])
 
   // Use ref to avoid stale closure in global listener
   const commitDragRef = useRef(commitDrag)
@@ -448,12 +465,53 @@ export default function Timeline({
     }
   }, [project])
 
+  /** Check if mouse is near the edge of an item for trim */
+  const getEdgeProximity = useCallback(
+    (canvasX: number, canvasY: number): { item: TimelineItem; trackIndex: number; edge: 'start' | 'end' } | null => {
+      const trackIndex = Math.floor(canvasY / TRACK_HEIGHT)
+      if (trackIndex < 0 || trackIndex >= project.tracks.length) return null
+      const track = project.tracks[trackIndex]
+      const frameX = (canvasX + scrollLeft) / scale
+      const edgeThreshold = 4 / scale // pixels → frames
+
+      for (const item of track.items) {
+        const distStart = Math.abs(frameX - item.startFrame)
+        const distEnd = Math.abs(frameX - item.endFrame)
+        if (distStart < edgeThreshold) {
+          return { item, trackIndex, edge: 'start' }
+        }
+        if (distEnd < edgeThreshold) {
+          return { item, trackIndex, edge: 'end' }
+        }
+      }
+      return null
+    },
+    [project.tracks, scale, scrollLeft],
+  )
+
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
       justDraggedRef.current = false
       const rect = e.currentTarget.getBoundingClientRect()
       const mx = e.clientX - rect.left
       const my = e.clientY - rect.top
+
+      // Check trim edge first (higher priority)
+      const edgeHit = getEdgeProximity(mx, my)
+      if (edgeHit) {
+        onSelectItem(edgeHit.trackIndex, edgeHit.item.id)
+        mouseXRef.current = mx
+        dragRef.current = {
+          active: true,
+          itemId: edgeHit.item.id,
+          trackIndex: edgeHit.trackIndex,
+          startX: mx,
+          startFrame: edgeHit.edge === 'start' ? edgeHit.item.startFrame : edgeHit.item.endFrame,
+          mode: edgeHit.edge === 'start' ? 'trim-start' : 'trim-end',
+        }
+        return
+      }
+
       const hit = findItemAt(mx, my)
       if (hit) {
         onSelectItem(hit.trackIndex, hit.item.id)
@@ -464,12 +522,13 @@ export default function Timeline({
           trackIndex: hit.trackIndex,
           startX: mx,
           startFrame: hit.item.startFrame,
+          mode: 'move',
         }
       } else {
         onSelectItem(0, null)
       }
     },
-    [findItemAt, onSelectItem],
+    [findItemAt, getEdgeProximity, onSelectItem],
   )
 
   const handleCanvasMouseMove = useCallback(
@@ -525,6 +584,17 @@ export default function Timeline({
 
   const handleZoomChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setScale(Number(e.target.value))
+  }, [])
+
+  // Scroll wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault()
+      setScale(prev => {
+        const delta = e.deltaY > 0 ? -1 : 1
+        return Math.max(MIN_SCALE, Math.min(MAX_SCALE, prev + delta))
+      })
+    }
   }, [])
 
   // Auto-scroll during playback
@@ -621,6 +691,7 @@ export default function Timeline({
               onMouseLeave={handleCanvasMouseLeave}
               onClick={handleCanvasClick}
               onDoubleClick={handleCanvasDoubleClick}
+              onWheel={handleWheel}
               style={{ width: totalWidth, height: totalHeight }}
             />
           </div>
