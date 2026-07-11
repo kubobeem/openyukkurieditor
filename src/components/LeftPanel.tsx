@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 
 interface MediaItem {
   id: string
@@ -29,6 +29,8 @@ interface LeftPanelProps {
   onSelectScene: (id: string) => void
   onAddMedia: () => void
   onSelectCharacter: (id: string) => void
+  onImportMedia?: (file: File) => void
+  onDropMedia?: (files: FileList) => void
 }
 
 type LeftTab = 'media' | 'characters' | 'scenes'
@@ -41,8 +43,12 @@ export default function LeftPanel({
   onSelectScene,
   onAddMedia,
   onSelectCharacter,
+  onImportMedia,
+  onDropMedia,
 }: LeftPanelProps) {
   const [activeTab, setActiveTab] = useState<LeftTab>('media')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [dragOver, setDragOver] = useState(false)
 
   return (
     <div className="ymm4-left-panel">
@@ -71,14 +77,55 @@ export default function LeftPanel({
         {activeTab === 'media' && (
           <div>
             <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*,audio/*,image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const files = e.target.files
+                  if (files && onImportMedia) {
+                    for (let i = 0; i < files.length; i++) onImportMedia(files[i])
+                  }
+                  e.target.value = ''
+                }}
+              />
               <button
                 className="ymm4-toolbar-btn"
                 style={{ width: '100%', justifyContent: 'center', border: '1px dashed var(--ymm4-border)' }}
-                onClick={onAddMedia}
+                onClick={() => fileInputRef.current?.click()}
               >
                 ＋ メディアを追加
               </button>
             </div>
+
+            {/* ドロップゾーン */}
+            {onDropMedia && (
+              <div
+                style={{
+                  margin: '8px 12px',
+                  padding: 16,
+                  border: `2px dashed ${dragOver ? 'var(--ymm4-accent)' : 'var(--ymm4-border)'}`,
+                  borderRadius: 6,
+                  textAlign: 'center',
+                  fontSize: 11,
+                  color: dragOver ? 'var(--ymm4-accent)' : 'var(--ymm4-text-muted)',
+                  background: dragOver ? 'rgba(204,120,92,0.08)' : 'transparent',
+                  transition: 'all 0.2s',
+                }}
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => {
+                  e.preventDefault()
+                  setDragOver(false)
+                  if (e.dataTransfer.files.length > 0) onDropMedia(e.dataTransfer.files)
+                }}
+              >
+                📁 ここにファイルをドロップ
+              </div>
+            )}
+
             {mediaItems.length === 0 && (
               <div style={{ padding: 24, textAlign: 'center', color: 'var(--ymm4-text-muted)', fontSize: 11 }}>
                 メディアがありません

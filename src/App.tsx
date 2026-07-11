@@ -41,6 +41,28 @@ function trackTypeForItem(item: TimelineItem): TrackType {
   return 'video'
 }
 
+function loadCustomShortcuts(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem('oye_shortcuts')
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function checkCombo(e: KeyboardEvent, combo: string): boolean {
+  const parts = combo.split('+')
+  const key = parts.pop() || ''
+  const hasCtrl = parts.includes('Ctrl')
+  const hasShift = parts.includes('Shift')
+  const hasAlt = parts.includes('Alt')
+  const isMeta = e.ctrlKey || e.metaKey
+  return (
+    hasCtrl === isMeta &&
+    hasShift === e.shiftKey &&
+    hasAlt === e.altKey &&
+    (e.key === key || e.code === key || e.key.toUpperCase() === key.toUpperCase())
+  )
+}
+
 // エンジン初期化
 registerBuiltinEffects()
 const voiceEngine = new VoiceEngineManager()
@@ -473,6 +495,39 @@ export default function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return
+
+      // Check custom shortcuts from localStorage first (read fresh on every keystroke)
+      const customShortcuts = loadCustomShortcuts()
+      for (const [action, combo] of Object.entries(customShortcuts)) {
+        if (checkCombo(e, combo)) {
+          e.preventDefault()
+          switch (action) {
+            case 'save': void handleSaveProject(); return
+            case 'undo': handleUndo(); return
+            case 'redo': handleRedo(); return
+            case 'copy': const s = getSelectedItem(); if (s) handleCopySelectedClip(); return
+            case 'cut': handleCutSelectedClip(); return
+            case 'paste': handlePasteClip(); return
+            case 'duplicate': handleDuplicateSelectedClip(); return
+            case 'delete': handleDeleteSelectedClip(); return
+            case 'rippleDelete': handleRippleDeleteSelectedClip(); return
+            case 'split': handleSplitSelectedClip(); return
+            case 'playPause': setIsPlaying(prev => !prev); return
+            case 'toggleMarker': handleToggleMarkerAtCurrentFrame(); return
+            case 'prevMarker': jumpToMarker(-1); return
+            case 'nextMarker': jumpToMarker(1); return
+            case 'toggleSnap': cycleSnapFrames(); return
+            case 'prevClip': selectAdjacentClip(-1); return
+            case 'nextClip': selectAdjacentClip(1); return
+            case 'home': setCurrentFrame(0); return
+            case 'end': setCurrentFrame(projectRef.current.settings.totalFrames - 1); return
+            case 'group': handleGroupItems(selectedItemIds); return
+            case 'ungroup': { const gIds = [...new Set(projectRef.current.tracks.reduce<string[]>((acc, t) => { t.items.forEach(item => { if (selectedItemIds.includes(item.id) && item.groupId) acc.push(item.groupId!) }); return acc }, []))]; handleUngroupItems(gIds); return }
+          }
+          break
+        }
+      }
+
       const isMeta = e.ctrlKey || e.metaKey
       const key = e.key.toLowerCase()
 
@@ -575,6 +630,13 @@ export default function App() {
 
   const handleToggleTrackSolo = useCallback((trackIndex: number) => {
     applyProjectUpdate(prev => ({ ...prev, tracks: prev.tracks.map((t, i) => i === trackIndex ? { ...t, solo: !t.solo } : t) }))
+  }, [applyProjectUpdate])
+
+  const handleChangeTrackColor = useCallback((trackIndex: number, color: string) => {
+    applyProjectUpdate(prev => ({
+      ...prev,
+      tracks: prev.tracks.map((t, i) => i === trackIndex ? { ...t, color } : t),
+    }))
   }, [applyProjectUpdate])
 
   // --- ダミーデータ ---
@@ -699,6 +761,23 @@ export default function App() {
           onSelectScene={() => {}}
           onAddMedia={() => {}}
           onSelectCharacter={setCurrentCharacterId}
+          onImportMedia={(file) => {
+            const ext = file.name.split('.').pop()?.toLowerCase()
+            let type: 'video' | 'audio' | 'image' = 'video'
+            if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext || '')) type = 'audio'
+            else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext || '')) type = 'image'
+            console.log(`[Import] ${file.name} (${type})`)
+          }}
+          onDropMedia={(files) => {
+            for (let i = 0; i < files.length; i++) {
+              const f = files[i]
+              const ext = f.name.split('.').pop()?.toLowerCase()
+              let type: 'video' | 'audio' | 'image' = 'video'
+              if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext || '')) type = 'audio'
+              else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext || '')) type = 'image'
+              console.log(`[Import] ${f.name} (${type})`)
+            }
+          }}
         />
 
         {/* 中央（プレビュー + セリフ入力） */}
@@ -773,6 +852,7 @@ export default function App() {
               onToggleTrackMute={handleToggleTrackMute}
               onToggleTrackLock={handleToggleTrackLock}
               onToggleTrackSolo={handleToggleTrackSolo}
+              onChangeTrackColor={handleChangeTrackColor}
             />
           </div>
         </div>

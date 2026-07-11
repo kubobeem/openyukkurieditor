@@ -24,6 +24,7 @@ interface TimelineProps {
   onToggleTrackMute: (trackIndex: number) => void
   onToggleTrackLock: (trackIndex: number) => void
   onToggleTrackSolo: (trackIndex: number) => void
+  onChangeTrackColor?: (trackIndex: number, color: string) => void
 }
 
 const DEFAULT_SCALE = 8
@@ -76,6 +77,7 @@ export default function Timeline({
   onToggleTrackMute,
   onToggleTrackLock,
   onToggleTrackSolo,
+  onChangeTrackColor,
 }: TimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rulerRef = useRef<HTMLCanvasElement>(null)
@@ -855,6 +857,15 @@ export default function Timeline({
                   {track.type === 'video' ? '🎬' : track.type === 'audio' ? '🎵' : 'Ｔ'}
                 </span>
                 <span className="track-list-title">{track.name}</span>
+                <input
+                  type="color"
+                  className="track-color-picker"
+                  value={track.color || '#4fc3f7'}
+                  title="トラック色を変更"
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => onChangeTrackColor?.(index, e.target.value)}
+                  style={{ width: 16, height: 16, padding: 0, border: 'none', cursor: 'pointer', background: 'transparent', marginLeft: 4, verticalAlign: 'middle', borderRadius: 2 }}
+                />
               </div>
               <div className="track-list-controls">
                 <button
