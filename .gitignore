@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-electron/
+release/
+
+# Generated icon PNGs (SVG is the source)
+buildResources/icon*.png
+!buildResources/icon.svg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

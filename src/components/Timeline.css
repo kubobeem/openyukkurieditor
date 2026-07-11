@@ -1,0 +1,207 @@
+/* ============================================================
+   Timeline Component Styles
+   ============================================================ */
+
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+}
+
+/* Header: Track list title + Ruler */
+.timeline-header {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-color);
+  height: 32px;
+}
+
+.track-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ruler-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+
+.ruler-canvas {
+  display: block;
+}
+
+/* Body: Track list + Canvas */
+.timeline-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Track List (Left) */
+.track-list {
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+}
+
+.track-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  transition: background 0.1s;
+  cursor: pointer;
+  gap: 4px;
+}
+
+.track-list-item:hover {
+  background: var(--bg-hover);
+}
+
+.track-list-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.track-list-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.track-list-title {
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-list-controls {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.track-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 3px;
+  transition: all 0.1s;
+  font-size: 11px;
+}
+
+.track-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.track-btn.active {
+  background: rgba(255, 82, 82, 0.15);
+  color: #ff5252;
+}
+
+/* Scrollable canvas area */
+.timeline-scroll {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.timeline-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.timeline-scroll::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+.timeline-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 5px;
+  border: 2px solid var(--bg-primary);
+}
+
+.timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.timeline-canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+/* Footer: Zoom controls */
+.timeline-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 16px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.timeline-footer .zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeline-footer .zoom-slider {
+  width: 120px;
+  height: 4px;
+  -webkit-appearance: none;
+  background: var(--border-light);
+  border-radius: 2px;
+  outline: none;
+}
+
+.timeline-footer .zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.timeline-footer .zoom-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.timeline-footer .zoom-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.timeline-footer-info {
+  font-size: 10px;
+  color: var(--text-muted);
+}

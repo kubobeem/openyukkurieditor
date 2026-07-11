@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c4dff"/>
+      <stop offset="100%" style="stop-color:#448aff"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#b388ff"/>
+      <stop offset="100%" style="stop-color:#82b1ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- Inner glow circle -->
+  <circle cx="256" cy="256" r="180" fill="url(#glow)" opacity="0.15"/>
+
+  <!-- Play triangle -->
+  <polygon points="210,160 210,352 370,256" fill="white" opacity="0.95"/>
+
+  <!-- Film strip bars -->
+  <rect x="130" y="140" width="12" height="40" rx="3" fill="white" opacity="0.6"/>
+  <rect x="130" y="200" width="12" height="40" rx="3" fill="white" opacity="0.6"/>
+  <rect x="130" y="260" width="12" height="40" rx="3" fill="white" opacity="0.6"/>
+  <rect x="130" y="320" width="12" height="40" rx="3" fill="white" opacity="0.6"/>
+
+  <!-- Timeline waveform -->
+  <path d="M100,380 Q140,340 160,370 Q180,400 200,360 Q220,320 240,380 Q260,440 280,360
+           Q300,280 320,350 Q340,420 360,380 Q380,340 400,370 L412,400 L100,400 Z"
+        fill="white" opacity="0.2"/>
+</svg>
