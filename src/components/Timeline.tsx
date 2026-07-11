@@ -9,6 +9,11 @@ interface TimelineProps {
   onAddClip: (trackIndex: number) => void
   onMoveItem: (trackIndex: number, itemId: string, newStartFrame: number) => void
   isPlaying: boolean
+  snapFrames: number
+  selectedItemId: string | null
+  onSelectItem: (trackIndex: number, itemId: string | null) => void
+  onToggleTrackMute: (trackIndex: number) => void
+  onToggleTrackLock: (trackIndex: number) => void
 }
 
 const DEFAULT_SCALE = 8
@@ -46,6 +51,11 @@ export default function Timeline({
   onAddClip,
   onMoveItem,
   isPlaying,
+  snapFrames,
+  selectedItemId,
+  onSelectItem,
+  onToggleTrackMute,
+  onToggleTrackLock,
 }: TimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rulerRef = useRef<HTMLCanvasElement>(null)
@@ -55,7 +65,6 @@ export default function Timeline({
   const [scale, setScale] = useState(DEFAULT_SCALE)
   const [scrollLeft, setScrollLeft] = useState(0)
   const [hoveredTrackIndex, setHoveredTrackIndex] = useState<number | null>(null)
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
 
   // Drag state
   const dragRef = useRef<{
@@ -353,6 +362,8 @@ export default function Timeline({
     if (!drag.active || !drag.itemId) return
     drag.active = false
     justDraggedRef.current = true
+    const track = project.tracks[drag.trackIndex]
+    if (!track || track.locked) return
 
     // Calculate new position from the last known mouse position
     const deltaFrames = Math.round((mouseXRef.current - drag.startX) / scale)
@@ -361,11 +372,13 @@ export default function Timeline({
     if (!draggedItem) return
     const itemDuration = draggedItem.endFrame - draggedItem.startFrame
     const maxStart = Math.max(0, project.settings.totalFrames - itemDuration)
-    const newStart = Math.max(0, Math.min(maxStart, drag.startFrame + deltaFrames))
+    const rawStart = drag.startFrame + deltaFrames
+    const snappedStart = snapFrames > 1 ? Math.round(rawStart / snapFrames) * snapFrames : rawStart
+    const newStart = Math.max(0, Math.min(maxStart, snappedStart))
     if (newStart !== drag.startFrame) {
       onMoveItem(drag.trackIndex, drag.itemId, newStart)
     }
-  }, [scale, onMoveItem, project.tracks, project.settings.totalFrames])
+  }, [scale, snapFrames, onMoveItem, project.tracks, project.settings.totalFrames])
 
   // Use ref to avoid stale closure in global listener
   const commitDragRef = useRef(commitDrag)
@@ -400,7 +413,7 @@ export default function Timeline({
       const my = e.clientY - rect.top
       const hit = findItemAt(mx, my)
       if (hit) {
-        setSelectedItemId(hit.item.id)
+        onSelectItem(hit.trackIndex, hit.item.id)
         mouseXRef.current = mx
         dragRef.current = {
           active: true,
@@ -410,10 +423,10 @@ export default function Timeline({
           startFrame: hit.item.startFrame,
         }
       } else {
-        setSelectedItemId(null)
+        onSelectItem(0, null)
       }
     },
-    [findItemAt],
+    [findItemAt, onSelectItem],
   )
 
   const handleCanvasMouseMove = useCallback(
@@ -462,9 +475,9 @@ export default function Timeline({
       const rect = e.currentTarget.getBoundingClientRect()
       const y = e.clientY - rect.top
       const ti = Math.floor(y / TRACK_HEIGHT)
-      if (ti >= 0 && ti < project.tracks.length) onAddClip(ti)
+      if (ti >= 0 && ti < project.tracks.length && !project.tracks[ti].locked) onAddClip(ti)
     },
-    [project.tracks.length, onAddClip],
+    [project.tracks, onAddClip],
   )
 
   const handleZoomChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -518,8 +531,26 @@ export default function Timeline({
                 <span className="track-list-title">{track.name}</span>
               </div>
               <div className="track-list-controls">
-                <button className="track-btn" title="ミュート">🔊</button>
-                <button className="track-btn" title="ロック">🔓</button>
+                <button
+                  className={`track-btn ${track.mute ? 'active' : ''}`}
+                  title={track.mute ? 'ミュート解除' : 'ミュート'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleTrackMute(index)
+                  }}
+                >
+                  {track.mute ? '🔇' : '🔊'}
+                </button>
+                <button
+                  className={`track-btn ${track.locked ? 'active' : ''}`}
+                  title={track.locked ? 'ロック解除' : 'ロック'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleTrackLock(index)
+                  }}
+                >
+                  {track.locked ? '🔒' : '🔓'}
+                </button>
               </div>
             </div>
           ))}
@@ -563,7 +594,8 @@ export default function Timeline({
         <div className="timeline-footer-info">
           <span>ダブルクリックでクリップ追加</span>
           <span style={{ marginLeft: 16 }}>全 {clipCount} クリップ</span>
-          {selectedItemId &&          <span style={{ marginLeft: 16, color: '#cc785c' }}>選択中</span>}
+          <span style={{ marginLeft: 16 }}>スナップ: {snapFrames}f</span>
+          {selectedItemId && <span style={{ marginLeft: 16, color: '#cc785c' }}>選択中</span>}
         </div>
       </div>
     </div>

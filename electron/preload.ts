@@ -2,13 +2,19 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   onOpenProject: (callback: (filePath: string) => void) => {
-    ipcRenderer.on('open-project', (_event, filePath) => callback(filePath))
+    const listener = (_event: unknown, filePath: string) => callback(filePath)
+    ipcRenderer.on('open-project', listener)
+    return () => ipcRenderer.off('open-project', listener)
   },
   onSaveProject: (callback: () => void) => {
-    ipcRenderer.on('save-project', () => callback())
+    const listener = () => callback()
+    ipcRenderer.on('save-project', listener)
+    return () => ipcRenderer.off('save-project', listener)
   },
   onSaveProjectAs: (callback: (filePath: string) => void) => {
-    ipcRenderer.on('save-project-as', (_event, filePath) => callback(filePath))
+    const listener = (_event: unknown, filePath: string) => callback(filePath)
+    ipcRenderer.on('save-project-as', listener)
+    return () => ipcRenderer.off('save-project-as', listener)
   },
   showSaveDialog: () => ipcRenderer.invoke('show-save-dialog'),
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
