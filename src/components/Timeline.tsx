@@ -8,12 +8,15 @@ interface TimelineProps {
   onFrameChange: (frame: number) => void
   onAddClip: (trackIndex: number) => void
   onMoveItem: (trackIndex: number, itemId: string, newStartFrame: number) => void
+  onMoveItemToTrack?: (itemId: string, fromTrackIndex: number, toTrackIndex: number, newStartFrame: number) => void
   onTrimItem?: (trackIndex: number, itemId: string, newStartFrame: number, newEndFrame: number) => void
   isPlaying: boolean
   snapFrames: number
   markers: number[]
   selectedItemId: string | null
+  selectedItemIds: string[]
   onSelectItem: (trackIndex: number, itemId: string | null) => void
+  onSelectItems: (itemIds: string[]) => void
   onToggleTrackMute: (trackIndex: number) => void
   onToggleTrackLock: (trackIndex: number) => void
   onToggleTrackSolo: (trackIndex: number) => void
@@ -58,7 +61,10 @@ export default function Timeline({
   snapFrames,
   markers,
   selectedItemId,
+  selectedItemIds,
   onSelectItem,
+  onSelectItems,
+  onMoveItemToTrack,
   onToggleTrackMute,
   onToggleTrackLock,
   onToggleTrackSolo,
@@ -75,12 +81,13 @@ export default function Timeline({
   // Drag state
   const dragRef = useRef<{
     active: boolean
+    itemIds: string[]
     itemId: string | null
     trackIndex: number
     startX: number
     startFrame: number
     mode: 'move' | 'trim-start' | 'trim-end'
-  }>({ active: false, itemId: null, trackIndex: -1, startX: 0, startFrame: 0, mode: 'move' })
+  }>({ active: false, itemIds: [], itemId: null, trackIndex: -1, startX: 0, startFrame: 0, mode: 'move' })
   const justDraggedRef = useRef(false)
 
   const totalWidth = project.settings.totalFrames * scale
@@ -254,7 +261,7 @@ export default function Timeline({
 
       // Clips
       track.items.forEach(item => {
-        const isSelected = selectedItemId === item.id
+        const isSelected = selectedItemIds.includes(item.id)
         const itemX = item.startFrame * scale - scrollLeft
         const itemW = (item.endFrame - item.startFrame) * scale
         const itemY = y + 4
@@ -402,14 +409,13 @@ export default function Timeline({
 
   // Drag: we track current mouse position for delta calculation on commit
   const mouseXRef = useRef(0)
+  const mouseYRef = useRef(0)
 
   const commitDrag = useCallback(() => {
     const drag = dragRef.current
     if (!drag.active || !drag.itemId) return
     drag.active = false
     justDraggedRef.current = true
-    const track = project.tracks[drag.trackIndex]
-    if (!track || track.locked) return
 
     const draggedItem = project.tracks[drag.trackIndex]?.items.find(i => i.id === drag.itemId)
     if (!draggedItem) return
@@ -418,6 +424,25 @@ export default function Timeline({
     const snappedDelta = snapFrames > 1 ? Math.round(deltaFrames / snapFrames) * snapFrames : deltaFrames
 
     if (drag.mode === 'move') {
+      // Check if dragged to a different track
+      const targetTrackY = mouseYRef.current
+      const targetTrackIndex = Math.floor(targetTrackY / TRACK_HEIGHT)
+      const sameTrack = targetTrackIndex === drag.trackIndex
+
+      if (!sameTrack && targetTrackIndex >= 0 && targetTrackIndex < project.tracks.length && onMoveItemToTrack) {
+        const targetTrack = project.tracks[targetTrackIndex]
+        if (!targetTrack.locked) {
+          const itemDuration = draggedItem.endFrame - draggedItem.startFrame
+          const maxStart = Math.max(0, project.settings.totalFrames - itemDuration)
+          const rawStart = drag.startFrame + snappedDelta
+          const newStart = Math.max(0, Math.min(maxStart, rawStart))
+          onMoveItemToTrack(drag.itemId, drag.trackIndex, targetTrackIndex, newStart)
+          return
+        }
+      }
+
+      const track = project.tracks[drag.trackIndex]
+      if (!track || track.locked) return
       const itemDuration = draggedItem.endFrame - draggedItem.startFrame
       const maxStart = Math.max(0, project.settings.totalFrames - itemDuration)
       const rawStart = drag.startFrame + snappedDelta
@@ -425,20 +450,25 @@ export default function Timeline({
       if (newStart !== drag.startFrame) {
         onMoveItem(drag.trackIndex, drag.itemId, newStart)
       }
-    } else if (drag.mode === 'trim-start' && onTrimItem) {
-      const rawStart = drag.startFrame + snappedDelta
-      const newStart = Math.max(0, Math.min(rawStart, draggedItem.endFrame - 1))
-      if (newStart !== drag.startFrame) {
-        onTrimItem(drag.trackIndex, drag.itemId, newStart, draggedItem.endFrame)
-      }
-    } else if (drag.mode === 'trim-end' && onTrimItem) {
-      const rawEnd = draggedItem.endFrame + snappedDelta
-      const newEnd = Math.min(project.settings.totalFrames, Math.max(rawEnd, draggedItem.startFrame + 1))
-      if (newEnd !== draggedItem.endFrame) {
-        onTrimItem(drag.trackIndex, drag.itemId, draggedItem.startFrame, newEnd)
+    } else {
+      const track = project.tracks[drag.trackIndex]
+      if (!track || track.locked) return
+
+      if (drag.mode === 'trim-start' && onTrimItem) {
+        const rawStart = drag.startFrame + snappedDelta
+        const newStart = Math.max(0, Math.min(rawStart, draggedItem.endFrame - 1))
+        if (newStart !== drag.startFrame) {
+          onTrimItem(drag.trackIndex, drag.itemId, newStart, draggedItem.endFrame)
+        }
+      } else if (drag.mode === 'trim-end' && onTrimItem) {
+        const rawEnd = draggedItem.endFrame + snappedDelta
+        const newEnd = Math.min(project.settings.totalFrames, Math.max(rawEnd, draggedItem.startFrame + 1))
+        if (newEnd !== draggedItem.endFrame) {
+          onTrimItem(drag.trackIndex, drag.itemId, draggedItem.startFrame, newEnd)
+        }
       }
     }
-  }, [scale, snapFrames, onMoveItem, onTrimItem, project.tracks, project.settings.totalFrames])
+  }, [scale, snapFrames, onMoveItem, onMoveItemToTrack, onTrimItem, project.tracks, project.settings.totalFrames])
 
   // Use ref to avoid stale closure in global listener
   const commitDragRef = useRef(commitDrag)
@@ -501,8 +531,10 @@ export default function Timeline({
       if (edgeHit) {
         onSelectItem(edgeHit.trackIndex, edgeHit.item.id)
         mouseXRef.current = mx
+        mouseYRef.current = my
         dragRef.current = {
           active: true,
+          itemIds: [edgeHit.item.id],
           itemId: edgeHit.item.id,
           trackIndex: edgeHit.trackIndex,
           startX: mx,
@@ -514,10 +546,29 @@ export default function Timeline({
 
       const hit = findItemAt(mx, my)
       if (hit) {
+        // Ctrl+click for multi-select
+        if (e.ctrlKey || e.metaKey) {
+          if (selectedItemIds.includes(hit.item.id)) {
+            const newIds = selectedItemIds.filter(id => id !== hit.item.id)
+            onSelectItems(newIds)
+            // If removing the primary selection, pick first remaining
+            if (hit.item.id === selectedItemId) {
+              onSelectItem(hit.trackIndex, newIds.length > 0 ? newIds[newIds.length - 1] : null)
+            }
+          } else {
+            onSelectItems([...selectedItemIds, hit.item.id])
+            onSelectItem(hit.trackIndex, hit.item.id)
+          }
+          return // don't start drag on Ctrl+click
+        }
+
         onSelectItem(hit.trackIndex, hit.item.id)
+        onSelectItems([hit.item.id])
         mouseXRef.current = mx
+        mouseYRef.current = my
         dragRef.current = {
           active: true,
+          itemIds: [hit.item.id],
           itemId: hit.item.id,
           trackIndex: hit.trackIndex,
           startX: mx,
@@ -526,9 +577,10 @@ export default function Timeline({
         }
       } else {
         onSelectItem(0, null)
+        onSelectItems([])
       }
     },
-    [findItemAt, getEdgeProximity, onSelectItem],
+    [findItemAt, getEdgeProximity, onSelectItem, onSelectItems, selectedItemIds, selectedItemId],
   )
 
   const handleCanvasMouseMove = useCallback(
@@ -546,6 +598,7 @@ export default function Timeline({
       const drag = dragRef.current
       if (drag.active) {
         mouseXRef.current = mx
+        mouseYRef.current = my
         scheduleDraw()
       }
     },
@@ -719,7 +772,7 @@ export default function Timeline({
           <span>ダブルクリックでクリップ追加</span>
           <span style={{ marginLeft: 16 }}>全 {clipCount} クリップ</span>
           <span style={{ marginLeft: 16 }}>スナップ: {snapFrames}f</span>
-          {selectedItemId && <span style={{ marginLeft: 16, color: '#cc785c' }}>選択中</span>}
+          {selectedItemIds.length > 0 && <span style={{ marginLeft: 16, color: '#cc785c' }}>{selectedItemIds.length}個選択</span>}
         </div>
       </div>
     </div>

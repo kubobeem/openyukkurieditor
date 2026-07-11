@@ -61,6 +61,7 @@ export default function App() {
 
   // --- UI 状態 ---
   const [selectedClip, setSelectedClip] = useState<SelectedClip | null>(null)
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
   const [snapFrames, setSnapFrames] = useState(1)
   const [markers, setMarkers] = useState<number[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -183,6 +184,25 @@ export default function App() {
         } : item),
       }),
     }))
+  }, [applyProjectUpdate])
+
+  const handleMoveItemToTrack = useCallback((itemId: string, fromTrackIndex: number, toTrackIndex: number, newStartFrame: number) => {
+    applyProjectUpdate(prev => {
+      const sourceTrack = prev.tracks[fromTrackIndex]
+      const targetTrack = prev.tracks[toTrackIndex]
+      if (!sourceTrack || !targetTrack || targetTrack.locked) return prev
+      const item = sourceTrack.items.find(i => i.id === itemId)
+      if (!item) return prev
+      const duration = item.endFrame - item.startFrame
+      return {
+        ...prev,
+        tracks: prev.tracks.map((track, i) => {
+          if (i === fromTrackIndex) return { ...track, items: track.items.filter(it => it.id !== itemId) }
+          if (i === toTrackIndex) return { ...track, items: [...track.items, { ...item, startFrame: newStartFrame, endFrame: newStartFrame + duration }] }
+          return track
+        }),
+      }
+    })
   }, [applyProjectUpdate])
 
   const handleMoveItem = useCallback((trackIndex: number, itemId: string, newStartFrame: number) => {
@@ -675,14 +695,17 @@ export default function App() {
               onAddClip={handleAddClip}
               onMoveItem={handleMoveItem}
               onTrimItem={handleTrimItem}
+              onMoveItemToTrack={handleMoveItemToTrack}
               isPlaying={isPlaying}
               snapFrames={snapFrames}
               markers={markers}
               selectedItemId={selectedClip?.itemId ?? null}
+              selectedItemIds={selectedItemIds}
               onSelectItem={(trackIndex, itemId) => {
                 if (!itemId) { setSelectedClip(null); return }
                 setSelectedClip({ trackIndex, itemId })
               }}
+              onSelectItems={(ids) => setSelectedItemIds(ids)}
               onToggleTrackMute={handleToggleTrackMute}
               onToggleTrackLock={handleToggleTrackLock}
               onToggleTrackSolo={handleToggleTrackSolo}
@@ -695,6 +718,7 @@ export default function App() {
           item={selectedItem?.item ?? null}
           totalFrames={project.settings.totalFrames}
           fps={project.settings.fps}
+          currentFrame={currentFrame}
           onUpdateItem={handleUpdateItem}
           onDeleteEffect={handleDeleteEffect}
         />

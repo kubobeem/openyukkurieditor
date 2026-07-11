@@ -5,6 +5,7 @@ interface ItemPropertiesPanelProps {
   item: TimelineItem | null
   totalFrames: number
   fps: number
+  currentFrame: number
   onUpdateItem: (updates: Partial<TimelineItem>) => void
   onDeleteEffect: (effectIndex: number) => void
 }
@@ -122,6 +123,7 @@ export default function ItemPropertiesPanel({
   item,
   totalFrames,
   fps,
+  currentFrame,
   onUpdateItem,
   onDeleteEffect,
 }: ItemPropertiesPanelProps) {
@@ -276,6 +278,83 @@ export default function ItemPropertiesPanel({
           <PropertyRow label="回転" value={item.transform.rotation} onChange={v => onUpdateItem({ transform: { ...item.transform, rotation: v } })} step={0.1} min={-360} max={360} />
           <PropertyRow label="不透明度" value={item.opacity} onChange={v => onUpdateItem({ opacity: Math.max(0, Math.min(1, v)) })} step={0.01} min={0} max={1} />
           <PropertyRow label="音量" value={item.volume} onChange={v => onUpdateItem({ volume: Math.max(0, Math.min(2, v)) })} step={0.01} min={0} max={2} />
+        </div>
+      </div>
+
+      {/* キーフレーム */}
+      <div className="ymm4-property-section">
+        <div className="ymm4-property-header">
+          <span>🎞 キーフレーム</span>
+          <span style={{ fontSize: 10, color: 'var(--ymm4-text-muted)' }}>
+            {item.keyframes.length}
+          </span>
+        </div>
+        <div className="ymm4-property-body">
+          {item.keyframes.length === 0 && (
+            <div style={{ fontSize: 11, color: 'var(--ymm4-text-muted)', padding: '4px 0' }}>
+              キーフレームなし（現在の値を開始→終了まで適用）
+            </div>
+          )}
+          {item.keyframes.map((kf, i) => (
+            <div key={i} className="ymm4-effect-item" style={{ fontSize: 11 }}>
+              <span style={{ color: 'var(--ymm4-yellow)', marginRight: 4 }}>◆</span>
+              <span className="effect-name">f{kf.frame}</span>
+              <span style={{ fontSize: 10, color: 'var(--ymm4-text-muted)' }}>
+                {Object.keys(kf.properties).join(', ')}
+              </span>
+              <span
+                className="effect-delete"
+                onClick={() => onUpdateItem({
+                  keyframes: item.keyframes.filter((_, j) => j !== i),
+                })}
+              >
+                ✕
+              </span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+            <button
+              className="ymm4-toolbar-btn"
+              style={{ flex: 1, justifyContent: 'center', fontSize: 10, border: '1px dashed var(--ymm4-border)' }}
+              onClick={() => {
+                const existing = item.keyframes.find(k => k.frame === currentFrame)
+                if (existing) {
+                  // Update existing keyframe
+                  onUpdateItem({
+                    keyframes: item.keyframes.map(k => k.frame === currentFrame ? {
+                      ...k,
+                      properties: {
+                        x: item.transform.x,
+                        y: item.transform.y,
+                        scaleX: item.transform.scaleX,
+                        scaleY: item.transform.scaleY,
+                        rotation: item.transform.rotation,
+                        opacity: item.opacity,
+                        volume: item.volume,
+                      },
+                    } : k),
+                  })
+                } else {
+                  onUpdateItem({
+                    keyframes: [...item.keyframes, {
+                      frame: currentFrame,
+                      properties: {
+                        x: item.transform.x,
+                        y: item.transform.y,
+                        scaleX: item.transform.scaleX,
+                        scaleY: item.transform.scaleY,
+                        rotation: item.transform.rotation,
+                        opacity: item.opacity,
+                        volume: item.volume,
+                      },
+                    }].sort((a, b) => a.frame - b.frame),
+                  })
+                }
+              }}
+            >
+              ＋ f{currentFrame}に追加
+            </button>
+          </div>
         </div>
       </div>
 
