@@ -19,6 +19,8 @@ interface TimelineProps {
   onSelectItems: (itemIds: string[]) => void
   onDeleteItem?: (trackIndex: number, itemId: string) => void
   onDuplicateItem?: (trackIndex: number, itemId: string) => void
+  onGroupItems?: (itemIds: string[]) => void
+  onUngroupItems?: (groupIds: string[]) => void
   onToggleTrackMute: (trackIndex: number) => void
   onToggleTrackLock: (trackIndex: number) => void
   onToggleTrackSolo: (trackIndex: number) => void
@@ -69,6 +71,8 @@ export default function Timeline({
   onMoveItemToTrack,
   onDeleteItem,
   onDuplicateItem,
+  onGroupItems,
+  onUngroupItems,
   onToggleTrackMute,
   onToggleTrackLock,
   onToggleTrackSolo,
@@ -81,6 +85,7 @@ export default function Timeline({
   const [scale, setScale] = useState(DEFAULT_SCALE)
   const [scrollLeft, setScrollLeft] = useState(0)
   const [hoveredTrackIndex, setHoveredTrackIndex] = useState<number | null>(null)
+  const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   // Drag state
   const dragRef = useRef<{
@@ -90,8 +95,9 @@ export default function Timeline({
     trackIndex: number
     startX: number
     startFrame: number
-    mode: 'move' | 'trim-start' | 'trim-end'
-  }>({ active: false, itemIds: [], itemId: null, trackIndex: -1, startX: 0, startFrame: 0, mode: 'move' })
+    startY: number
+    mode: 'move' | 'trim-start' | 'trim-end' | 'marquee'
+  }>({ active: false, itemIds: [], itemId: null, trackIndex: -1, startX: 0, startFrame: 0, startY: 0, mode: 'move' })
   const justDraggedRef = useRef(false)
 
   const totalWidth = project.settings.totalFrames * scale
@@ -320,6 +326,22 @@ export default function Timeline({
           ctx.stroke()
         }
 
+        // Keyframe markers on item
+        if (item.keyframes.length > 0 && itemW > 30) {
+          item.keyframes.forEach(kf => {
+            const kfx = (kf.frame - item.startFrame) * scale
+            if (kfx < -3 || kfx > itemW + 3) return
+            ctx.fillStyle = '#ffcc44'
+            ctx.beginPath()
+            ctx.moveTo(itemX + kfx, itemY + itemH - 6)
+            ctx.lineTo(itemX + kfx + 3, itemY + itemH - 3)
+            ctx.lineTo(itemX + kfx, itemY + itemH)
+            ctx.lineTo(itemX + kfx - 3, itemY + itemH - 3)
+            ctx.closePath()
+            ctx.fill()
+          })
+        }
+
         // Labels
         if (itemW > 60) {
           ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif'
@@ -359,6 +381,19 @@ export default function Timeline({
       })
     }
 
+    // Marquee selection rectangle
+    if (marqueeRect) {
+      ctx.fillStyle = 'rgba(204, 120, 92, 0.12)'
+      ctx.strokeStyle = '#cc785c'
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([4, 3])
+      ctx.beginPath()
+      ctx.rect(marqueeRect.x, marqueeRect.y, marqueeRect.w, marqueeRect.h)
+      ctx.fill()
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+
     // Playhead
     const phX = currentFrame * scale - scrollLeft
     if (phX >= 0 && phX <= cw) {
@@ -382,7 +417,7 @@ export default function Timeline({
       ctx.textAlign = 'center'
       ctx.fillText(`f${currentFrame}`, phX, ch - 6)
     }
-  }, [project, currentFrame, scale, scrollLeft, markers, hoveredTrackIndex, selectedItemId])
+  },    [project, currentFrame, scale, scrollLeft, markers, hoveredTrackIndex, selectedItemId, marqueeRect, selectedItemIds])
 
   // Redraw using requestAnimationFrame
   const scheduleDraw = useCallback(() => {
@@ -436,10 +471,40 @@ export default function Timeline({
 
   const commitDrag = useCallback(() => {
     const drag = dragRef.current
-    if (!drag.active || !drag.itemId) return
+    if (!drag.active) return
     drag.active = false
     justDraggedRef.current = true
 
+    // Marquee selection mode
+    if (drag.mode === 'marquee') {
+      setMarqueeRect(null)
+      const frameMin = (drag.startX < mouseXRef.current ? drag.startX : mouseXRef.current) + scrollLeft
+      const frameMax = (drag.startX > mouseXRef.current ? drag.startX : mouseXRef.current) + scrollLeft
+      const yMin = Math.min(drag.startY, mouseYRef.current)
+      const yMax = Math.max(drag.startY, mouseYRef.current)
+      const fMin = frameMin / scale
+      const fMax = frameMax / scale
+      const tMin = Math.floor(yMin / TRACK_HEIGHT)
+      const tMax = Math.floor(yMax / TRACK_HEIGHT)
+      const foundIds: string[] = []
+      let firstFound: { trackIndex: number; itemId: string } | null = null
+      for (let ti = Math.max(0, tMin); ti <= Math.min(project.tracks.length - 1, tMax); ti++) {
+        const track = project.tracks[ti]
+        for (const item of track.items) {
+          if (item.startFrame < fMax && item.endFrame > fMin) {
+            foundIds.push(item.id)
+            if (!firstFound) firstFound = { trackIndex: ti, itemId: item.id }
+          }
+        }
+      }
+      if (foundIds.length > 0) {
+        onSelectItems(foundIds)
+        if (firstFound) onSelectItem(firstFound.trackIndex, firstFound.itemId)
+      }
+      return
+    }
+
+    if (!drag.itemId) return
     const draggedItem = project.tracks[drag.trackIndex]?.items.find(i => i.id === drag.itemId)
     if (!draggedItem) return
 
@@ -491,7 +556,7 @@ export default function Timeline({
         }
       }
     }
-  }, [scale, snapFrames, onMoveItem, onMoveItemToTrack, onTrimItem, project.tracks, project.settings.totalFrames])
+  }, [scale, snapFrames, onMoveItem, onMoveItemToTrack, onTrimItem, onSelectItem, onSelectItems, project.tracks, project.settings.totalFrames])
 
   // Use ref to avoid stale closure in global listener
   const commitDragRef = useRef(commitDrag)
@@ -561,9 +626,28 @@ export default function Timeline({
           itemId: edgeHit.item.id,
           trackIndex: edgeHit.trackIndex,
           startX: mx,
+          startY: my,
           startFrame: edgeHit.edge === 'start' ? edgeHit.item.startFrame : edgeHit.item.endFrame,
           mode: edgeHit.edge === 'start' ? 'trim-start' : 'trim-end',
         }
+        return
+      }
+
+      // Shift+drag for marquee selection
+      if (e.shiftKey) {
+        onSelectItem(0, null)
+        onSelectItems([])
+        dragRef.current = {
+          active: true,
+          itemIds: [],
+          itemId: null,
+          trackIndex: -1,
+          startX: mx,
+          startFrame: 0,
+          startY: my,
+          mode: 'marquee',
+        }
+        setMarqueeRect({ x: mx, y: my, w: 0, h: 0 })
         return
       }
 
@@ -595,6 +679,7 @@ export default function Timeline({
           itemId: hit.item.id,
           trackIndex: hit.trackIndex,
           startX: mx,
+          startY: my,
           startFrame: hit.item.startFrame,
           mode: 'move',
         }
@@ -622,6 +707,13 @@ export default function Timeline({
       if (drag.active) {
         mouseXRef.current = mx
         mouseYRef.current = my
+        if (drag.mode === 'marquee') {
+          const x1 = Math.min(drag.startX, mx)
+          const y1 = Math.min(drag.startY, my)
+          const x2 = Math.max(drag.startX, mx)
+          const y2 = Math.max(drag.startY, my)
+          setMarqueeRect({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 })
+        }
         scheduleDraw()
       }
     },
@@ -689,8 +781,16 @@ export default function Timeline({
       onDeleteItem?.(menu.trackIndex, menu.itemId)
     } else if (action === 'duplicate') {
       onDuplicateItem?.(menu.trackIndex, menu.itemId)
+    } else if (action === 'group') {
+      onGroupItems?.(selectedItemIds)
+    } else if (action === 'ungroup') {
+      const groupIds = project.tracks.reduce<string[]>((acc, t) => {
+        t.items.forEach(item => { if (selectedItemIds.includes(item.id) && item.groupId) acc.push(item.groupId!) })
+        return acc
+      }, [])
+      onUngroupItems?.([...new Set(groupIds)])
     }
-  }, [contextMenu, onDeleteItem, onDuplicateItem])
+  }, [contextMenu, onDeleteItem, onDuplicateItem, onGroupItems, onUngroupItems, selectedItemIds, project.tracks])
 
   // Close context menu on click outside
   useEffect(() => {
@@ -862,6 +962,16 @@ export default function Timeline({
               <div className="ymm4-dropdown-item" onClick={() => handleContextMenuAction('delete')}>
                 削除
               </div>
+              {selectedItemIds.length >= 2 && (
+                <div className="ymm4-dropdown-item" onClick={() => handleContextMenuAction('group')}>
+                  グループ化
+                </div>
+              )}
+              {selectedItemIds.some(id => project.tracks.some(t => t.items.some(item => item.id === id && item.groupId))) && (
+                <div className="ymm4-dropdown-item" onClick={() => handleContextMenuAction('ungroup')}>
+                  グループ解除
+                </div>
+              )}
               <div className="ymm4-dropdown-separator" />
             </>
           )}

@@ -69,6 +69,7 @@ interface YmmpRawEffect {
 
 interface YmmpRawKeyframe {
   frame?: number
+  easing?: string
   x?: number
   y?: number
   scaleX?: number
@@ -132,6 +133,7 @@ function parseItem(raw: YmmpRawItem): TimelineItem {
     })),
     keyframes: (raw.keyframes || []).map(k => ({
       frame: k.frame ?? 0,
+      easing: (k.easing as any) || 'linear',
       properties: {
         x: k.x,
         y: k.y,
@@ -218,6 +220,7 @@ function serializeItem(item: TimelineItem): YmmpRawItem {
     })),
     keyframes: item.keyframes.map(k => ({
       frame: k.frame,
+      easing: k.easing,
       ...k.properties,
     })),
     text: item.text,

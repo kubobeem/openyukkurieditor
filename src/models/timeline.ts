@@ -23,9 +23,12 @@ export interface Effect {
   params: Record<string, number | string | boolean>
 }
 
+export type EasingType = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'bounce' | 'elastic'
+
 /** キーフレーム */
 export interface Keyframe {
   frame: number
+  easing: EasingType
   properties: Partial<{
     x: number
     y: number
@@ -40,6 +43,7 @@ export interface Keyframe {
 /** タイムライン上のアイテム（クリップ） */
 export interface TimelineItem {
   id: string
+  groupId?: string
   name: string
   type: ItemType
   sourcePath?: string
@@ -180,7 +184,7 @@ export function addSampleItem(project: Project, trackIndex: number): Project {
   if (!track) return project
 
   const lastFrame = track.items.reduce((max, item) => Math.max(max, item.endFrame), 0)
-  const item: TimelineItem = {
+    const item: TimelineItem = {
     id: generateId(),
     name: `${track.name} クリップ ${track.items.length + 1}`,
     type: track.type === 'text' ? 'text' : track.type === 'audio' ? 'audio' : 'video',
@@ -193,7 +197,7 @@ export function addSampleItem(project: Project, trackIndex: number): Project {
     effects: [],
     keyframes: [],
     text: track.type === 'text' ? 'テキストサンプル' : undefined,
-    color: getRandomColor(),
+    color: track.color || getRandomColor(),
   }
 
   return {

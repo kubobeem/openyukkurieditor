@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { TimelineItem, Effect } from '../models/timeline'
+import type { TimelineItem, Effect, EasingType } from '../models/timeline'
 
 interface ItemPropertiesPanelProps {
   item: TimelineItem | null
@@ -11,6 +11,15 @@ interface ItemPropertiesPanelProps {
 }
 
 type AnimationType = 'none' | 'fadeIn' | 'fadeOut' | 'slideInLeft' | 'slideInRight' | 'slideOutLeft' | 'slideOutRight' | 'zoomIn' | 'zoomOut'
+
+const EASING_OPTIONS: { value: EasingType; label: string }[] = [
+  { value: 'linear', label: 'リニア' },
+  { value: 'easeIn', label: 'イーズイン' },
+  { value: 'easeOut', label: 'イーズアウト' },
+  { value: 'easeInOut', label: 'イーズインアウト' },
+  { value: 'bounce', label: 'バウンス' },
+  { value: 'elastic', label: 'エラスティック' },
+]
 
 const ANIMATION_OPTIONS: { value: AnimationType; label: string }[] = [
   { value: 'none', label: 'なし' },
@@ -319,6 +328,22 @@ export default function ItemPropertiesPanel({
             <div key={i} className="ymm4-effect-item" style={{ fontSize: 11 }}>
               <span style={{ color: 'var(--ymm4-yellow)', marginRight: 4 }}>◆</span>
               <span className="effect-name">f{kf.frame}</span>
+              <select
+                className="ymm4-property-input"
+                value={kf.easing || 'linear'}
+                style={{ width: 'auto', fontSize: 10, margin: '0 4px', padding: '0 2px', height: 18 }}
+                onClick={e => e.stopPropagation()}
+                onChange={e => {
+                  const newEasing = e.target.value as EasingType
+                  onUpdateItem({
+                    keyframes: item.keyframes.map((k, j) => j === i ? { ...k, easing: newEasing } : k),
+                  })
+                }}
+              >
+                {EASING_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
               <span style={{ fontSize: 10, color: 'var(--ymm4-text-muted)' }}>
                 {Object.keys(kf.properties).join(', ')}
               </span>
@@ -358,6 +383,7 @@ export default function ItemPropertiesPanel({
                   onUpdateItem({
                     keyframes: [...item.keyframes, {
                       frame: currentFrame,
+                      easing: 'linear' as EasingType,
                       properties: {
                         x: item.transform.x,
                         y: item.transform.y,

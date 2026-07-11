@@ -445,6 +445,30 @@ export default function App() {
     }))
   }, [applyProjectUpdate])
 
+  // --- グループ化 / 解除 ---
+  const handleGroupItems = useCallback((itemIds: string[]) => {
+    if (itemIds.length < 2) return
+    const groupId = generateId()
+    applyProjectUpdate(prev => ({
+      ...prev,
+      tracks: prev.tracks.map(track => ({
+        ...track,
+        items: track.items.map(item => itemIds.includes(item.id) ? { ...item, groupId } : item),
+      })),
+    }))
+  }, [applyProjectUpdate])
+
+  const handleUngroupItems = useCallback((groupIds: string[]) => {
+    if (groupIds.length === 0) return
+    applyProjectUpdate(prev => ({
+      ...prev,
+      tracks: prev.tracks.map(track => ({
+        ...track,
+        items: track.items.map(item => groupIds.includes(item.groupId || '') ? { ...item, groupId: undefined } : item),
+      })),
+    }))
+  }, [applyProjectUpdate])
+
   // --- キーボードショートカット ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -460,6 +484,8 @@ export default function App() {
       if (isMeta && key === 'v') { e.preventDefault(); handlePasteClip(); return }
       if (isMeta && key === 'd') { e.preventDefault(); handleDuplicateSelectedClip(); return }
       if (e.shiftKey && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); handleRippleDeleteSelectedClip(); return }
+      if (isMeta && e.key === 'g') { e.preventDefault(); getSelectedItem() && handleGroupItems(selectedItemIds); return }
+      if (isMeta && e.shiftKey && e.key === 'g') { e.preventDefault(); const gIds = selectedItemIds.length > 0 ? [...new Set(projectRef.current.tracks.reduce<string[]>((acc, t) => { t.items.forEach(item => { if (selectedItemIds.includes(item.id) && item.groupId) acc.push(item.groupId!) }); return acc }, []))] : []; handleUngroupItems(gIds); return }
       if (isMeta && e.key === 'ArrowLeft') { e.preventDefault(); handleNudge(selectedClip, e.shiftKey ? -10 : -1); return }
       if (isMeta && e.key === 'ArrowRight') { e.preventDefault(); handleNudge(selectedClip, e.shiftKey ? 10 : 1); return }
       if (key === 's' && !isMeta) { e.preventDefault(); handleSplitSelectedClip(); return }
@@ -482,9 +508,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [
     clampFrame, cycleSnapFrames, getSelectedItem, handleCopySelectedClip, handleCutSelectedClip,
-    handleDeleteSelectedClip, handleDuplicateSelectedClip, handleNudge, handlePasteClip,
+    handleDeleteSelectedClip, handleDuplicateSelectedClip, handleGroupItems, handleNudge, handlePasteClip,
     handleRippleDeleteSelectedClip, handleSplitSelectedClip, handleToggleMarkerAtCurrentFrame,
     handleRedo, handleSaveProject, handleUndo, jumpToMarker, selectAdjacentClip, selectedClip,
+    selectedItemIds, handleUngroupItems,
   ])
 
   // --- 再生ループ ---
@@ -741,6 +768,8 @@ export default function App() {
                   }),
                 }))
               }}
+              onGroupItems={handleGroupItems}
+              onUngroupItems={handleUngroupItems}
               onToggleTrackMute={handleToggleTrackMute}
               onToggleTrackLock={handleToggleTrackLock}
               onToggleTrackSolo={handleToggleTrackSolo}
