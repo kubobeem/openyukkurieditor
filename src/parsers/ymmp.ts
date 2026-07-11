@@ -170,6 +170,16 @@ export function parseYmmp(jsonString: string): Project {
   try {
     const raw: YmmpRawProject = JSON.parse(jsonString)
 
+    const tracks = (raw.tracks || []).map((t, i) => parseTrack(t, i))
+    const sceneId = generateId()
+    const scenes = (raw.scenes && raw.scenes.length > 0)
+      ? raw.scenes.map(s => ({
+          id: s.id || generateId(),
+          name: s.name || 'シーン',
+          tracks: tracks.map(t => ({ ...t, items: [...t.items] })),
+        }))
+      : [{ id: sceneId, name: 'シーン 1', tracks: tracks.map(t => ({ ...t, items: [...t.items] })) }]
+
     return {
       version: raw.version || '1.0',
       name: raw.name || 'プロジェクト',
@@ -181,7 +191,9 @@ export function parseYmmp(jsonString: string): Project {
         audioSamplingRate: raw.samplingRate ?? 48000,
         backgroundColor: raw.bgColor || '#1a1a2e',
       },
-      tracks: (raw.tracks || []).map((t, i) => parseTrack(t, i)),
+      tracks,
+      scenes,
+      activeSceneId: scenes[0].id,
     }
   } catch (e) {
     throw new Error(`YMM4ファイルの解析に失敗しました: ${e}`)
@@ -256,6 +268,7 @@ export function serializeYmmp(project: Project): string {
     samplingRate: project.settings.audioSamplingRate,
     bgColor: project.settings.backgroundColor,
     tracks: project.tracks.map(serializeTrack),
+    scenes: project.scenes.map(s => ({ id: s.id, name: s.name })),
   }
 
   return JSON.stringify(raw, null, 2)

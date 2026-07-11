@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import type { Project, TimelineItem, TrackType } from './models/timeline'
-import { addSampleItem, addTrack, createDefaultProject, formatTime, generateId } from './models/timeline'
+import { addSampleItem, addTrack, createDefaultProject, formatTime, generateId, addScene, removeScene, renameScene, duplicateScene, switchScene } from './models/timeline'
 import { parseYmmp, serializeYmmp } from './parsers/ymmp'
 import { pluginManager } from './plugin/manager'
 import { registerBuiltinEffects } from './engine/effect/effects/effects-index'
@@ -91,6 +91,12 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
 
+  // --- レイアウト ---
+  const [leftPanelWidth, setLeftPanelWidth] = useState(240)
+  const [rightPanelWidth, setRightPanelWidth] = useState(320)
+  const [timelineHeight, setTimelineHeight] = useState(280)
+  const resizingRef = useRef<{ type: 'left' | 'right' | 'timeline'; startX: number; startY: number; startW: number; startH: number } | null>(null)
+
   // --- VOICEVOX / 音声 ---
   const [voiceText, setVoiceText] = useState('')
   const [voiceEngines, setVoiceEngines] = useState<any[]>([])
@@ -148,13 +154,31 @@ export default function App() {
     setProject(prev => {
       const next = updater(prev)
       if (next === prev) return prev
+      // Sync tracks back to active scene
+      const sceneIdx = next.scenes.findIndex(s => s.id === next.activeSceneId)
+      let synced = next
+      if (sceneIdx >= 0) {
+        const scenes = [...next.scenes]
+        scenes[sceneIdx] = { ...scenes[sceneIdx], tracks: next.tracks }
+        synced = { ...next, scenes }
+      }
       if (options?.recordHistory !== false) {
         historyRef.current.past.push(prev)
         if (historyRef.current.past.length > 120) historyRef.current.past.shift()
         historyRef.current.future = []
       }
-      return next
+      return synced
     })
+  }, [])
+
+  const syncTracksToScene = useCallback((p: Project): Project => {
+    const sceneIdx = p.scenes.findIndex(s => s.id === p.activeSceneId)
+    if (sceneIdx >= 0) {
+      const scenes = [...p.scenes]
+      scenes[sceneIdx] = { ...scenes[sceneIdx], tracks: p.tracks }
+      return { ...p, scenes }
+    }
+    return p
   }, [])
 
   const handleUndo = useCallback(() => {
@@ -162,18 +186,18 @@ export default function App() {
       const previous = historyRef.current.past.pop()
       if (!previous) return prev
       historyRef.current.future.push(prev)
-      return previous
+      return syncTracksToScene(previous)
     })
-  }, [])
+  }, [syncTracksToScene])
 
   const handleRedo = useCallback(() => {
     setProject(prev => {
       const next = historyRef.current.future.pop()
       if (!next) return prev
       historyRef.current.past.push(prev)
-      return next
+      return syncTracksToScene(next)
     })
-  }, [])
+  }, [syncTracksToScene])
 
   // --- プロジェクト保存 ---
   const handleSaveProject = useCallback(async (explicitPath?: string) => {
@@ -532,7 +556,9 @@ export default function App() {
       const isMeta = e.ctrlKey || e.metaKey
       const key = e.key.toLowerCase()
 
-      if (isMeta && key === 's') { e.preventDefault(); void handleSaveProject(); return }
+      if (isMeta && key === 'n') { e.preventDefault(); handleNewProject(); return }
+      if (isMeta && key === 'o') { e.preventDefault(); /* open dialog - handled by Electron */ return }
+      if (isMeta && key === 's') { e.preventDefault(); e.shiftKey ? (savePathRef.current ? void handleSaveProject(savePathRef.current) : void handleSaveProject()) : void handleSaveProject(); return }
       if (isMeta && key === 'z') { e.preventDefault(); e.shiftKey ? handleRedo() : handleUndo(); return }
       if (isMeta && key === 'y') { e.preventDefault(); handleRedo(); return }
       if (isMeta && key === 'c') { const s = getSelectedItem(); if (s) { e.preventDefault(); handleCopySelectedClip() } return }
@@ -566,7 +592,7 @@ export default function App() {
     clampFrame, cycleSnapFrames, getSelectedItem, handleCopySelectedClip, handleCutSelectedClip,
     handleDeleteSelectedClip, handleDuplicateSelectedClip, handleGroupItems, handleNudge, handlePasteClip,
     handleRippleDeleteSelectedClip, handleSplitSelectedClip, handleToggleMarkerAtCurrentFrame,
-    handleRedo, handleSaveProject, handleUndo, jumpToMarker, selectAdjacentClip, selectedClip,
+    handleNewProject, handleRedo, handleSaveProject, handleUndo, jumpToMarker, selectAdjacentClip, selectedClip,
     selectedItemIds, handleUngroupItems,
   ])
 
@@ -640,6 +666,32 @@ export default function App() {
     }))
   }, [applyProjectUpdate])
 
+  // --- シーン管理 ---
+  const handleAddScene = useCallback(() => {
+    applyProjectUpdate(prev => addScene(prev))
+  }, [applyProjectUpdate])
+
+  const handleRemoveScene = useCallback((sceneId: string) => {
+    if (project.scenes.length <= 1) return
+    applyProjectUpdate(prev => removeScene(prev, sceneId))
+    setSelectedClip(null)
+  }, [applyProjectUpdate, project.scenes.length])
+
+  const handleRenameScene = useCallback((sceneId: string, name: string) => {
+    applyProjectUpdate(prev => renameScene(prev, sceneId, name), { recordHistory: false })
+  }, [applyProjectUpdate])
+
+  const handleDuplicateScene = useCallback((sceneId: string) => {
+    applyProjectUpdate(prev => duplicateScene(prev, sceneId))
+  }, [applyProjectUpdate])
+
+  const handleSwitchScene = useCallback((sceneId: string) => {
+    if (sceneId === project.activeSceneId) return
+    applyProjectUpdate(prev => switchScene(prev, sceneId))
+    setSelectedClip(null)
+    setSelectedItemIds([])
+  }, [applyProjectUpdate, project.activeSceneId])
+
   // --- ダミーデータ ---
   const mediaItems = [
     { id: 'm1', name: 'サンプル動画.mp4', type: 'video' as const, icon: '🎬' },
@@ -653,9 +705,11 @@ export default function App() {
     { id: 'tsumugi', name: '紡音つむぎ', engine: 'aivoice', avatar: '🎤', available: false },
   ]
 
-  const scenes = [
-    { id: 's1', name: 'シーン 1', duration: 9000 },
-  ]
+  const scenesForLeft = project.scenes.map(s => ({
+    id: s.id,
+    name: s.name,
+    duration: 9000,
+  }))
 
   const plugins = [
     ...pluginManager.getVideoEffects().map(e => ({ name: e.meta.name, id: e.meta.id, type: 'effect' })),
@@ -752,14 +806,43 @@ export default function App() {
       </div>
 
       {/* メインエリア */}
-      <div className="ymm4-main-area">
-        {/* 左パネル */}
+      <div
+        className="ymm4-main-area"
+        style={{ '--left-panel-width': `${leftPanelWidth}px`, '--right-panel-width': `${rightPanelWidth}px`, '--timeline-height': `${timelineHeight}px` } as React.CSSProperties}
+        onMouseMove={(e) => {
+          const r = resizingRef.current
+          if (!r) return
+          if (r.type === 'left') {
+            setLeftPanelWidth(Math.max(140, Math.min(500, r.startW + (e.clientX - r.startX))))
+          } else if (r.type === 'right') {
+            setRightPanelWidth(Math.max(200, Math.min(500, r.startW - (e.clientX - r.startX))))
+          } else if (r.type === 'timeline') {
+            const ch = e.currentTarget.clientHeight
+            const maxH = ch - 100
+            setTimelineHeight(Math.max(100, Math.min(maxH, r.startH + (r.startY - e.clientY))))
+          }
+        }}
+        onMouseUp={() => { resizingRef.current = null }}
+        onMouseLeave={() => { resizingRef.current = null }}
+      >
+        {/* 左パネルリサイズハンドル */}
+        <div
+          className="ymm4-resize-handle ymm4-resize-handle-left"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            resizingRef.current = { type: 'left', startX: e.clientX, startY: 0, startW: leftPanelWidth, startH: 0 }
+          }}
+        />
         <LeftPanel
           mediaItems={mediaItems}
           characters={characters}
-          scenes={scenes}
-          activeSceneId="s1"
-          onSelectScene={() => {}}
+          scenes={scenesForLeft}
+          activeSceneId={project.activeSceneId}
+          onSelectScene={handleSwitchScene}
+          onAddScene={handleAddScene}
+          onRemoveScene={handleRemoveScene}
+          onRenameScene={handleRenameScene}
+          onDuplicateScene={handleDuplicateScene}
           onAddMedia={() => {}}
           onSelectCharacter={setCurrentCharacterId}
           onImportMedia={(file) => {
@@ -799,8 +882,19 @@ export default function App() {
             onAddSerif={handleAddSerif}
           />
 
+          {/* タイムラインリサイズハンドル */}
+          <div
+            className="ymm4-resize-handle ymm4-resize-handle-timeline"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              const center = (e.currentTarget as HTMLElement).parentElement
+              const wrapper = center?.querySelector('.ymm4-timeline-wrapper') as HTMLElement
+              resizingRef.current = { type: 'timeline', startX: 0, startY: e.clientY, startW: 0, startH: wrapper?.offsetHeight || timelineHeight }
+            }}
+          />
+
           {/* タイムライン */}
-          <div className="ymm4-timeline-wrapper">
+          <div className="ymm4-timeline-wrapper" style={{ height: timelineHeight }}>
             <Timeline
               project={project}
               currentFrame={currentFrame}
@@ -855,8 +949,26 @@ export default function App() {
               onChangeTrackColor={handleChangeTrackColor}
             />
           </div>
+          {/* タイムラインリサイズハンドル（下部） */}
+          <div
+            className="ymm4-resize-handle ymm4-resize-handle-timeline-bottom"
+            onMouseDown={(e) => {
+              e.preventDefault()
+              const center = (e.currentTarget as HTMLElement).parentElement
+              const wrapper = center?.querySelector('.ymm4-timeline-wrapper') as HTMLElement
+              resizingRef.current = { type: 'timeline', startX: 0, startY: e.clientY, startW: 0, startH: wrapper?.offsetHeight || timelineHeight }
+            }}
+          />
         </div>
 
+        {/* 右パネルリサイズハンドル */}
+        <div
+          className="ymm4-resize-handle ymm4-resize-handle-right"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            resizingRef.current = { type: 'right', startX: e.clientX, startY: 0, startW: rightPanelWidth, startH: 0 }
+          }}
+        />
         {/* 右パネル（アイテムプロパティ） */}
         <ItemPropertiesPanel
           item={selectedItem?.item ?? null}

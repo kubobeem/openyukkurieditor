@@ -213,6 +213,69 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
+}
+
+/* リサイズハンドル */
+.ymm4-resize-handle {
+  flex-shrink: 0;
+  z-index: 10;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.ymm4-resize-handle:hover {
+  background: var(--ymm4-accent-dim);
+}
+
+.ymm4-resize-handle-left {
+  width: 4px;
+  cursor: col-resize;
+  position: absolute;
+  left: var(--left-panel-width, 240px);
+  top: 0;
+  bottom: 0;
+  margin-left: -2px;
+}
+
+.ymm4-resize-handle-right {
+  width: 4px;
+  cursor: col-resize;
+  position: absolute;
+  right: var(--right-panel-width, 320px);
+  top: 0;
+  bottom: 0;
+  margin-right: -2px;
+}
+
+.ymm4-resize-handle-timeline {
+  height: 4px;
+  cursor: row-resize;
+  flex-shrink: 0;
+}
+
+.ymm4-resize-handle-timeline:hover {
+  background: var(--ymm4-accent-dim);
+}
+
+.ymm4-resize-handle-timeline-bottom {
+  height: 4px;
+  cursor: row-resize;
+  flex-shrink: 0;
+}
+
+.ymm4-resize-handle-timeline-bottom:hover {
+  background: var(--ymm4-accent-dim);
+}
+
+/* 左パネル - CSS変数で幅制御 */
+.ymm4-main-area .ymm4-left-panel {
+  width: var(--left-panel-width, 240px);
+}
+
+/* 右パネル - CSS変数で幅制御 */
+.ymm4-main-area .ymm4-right-panel {
+  width: var(--right-panel-width, 320px);
 }
 
 /* ============================================================

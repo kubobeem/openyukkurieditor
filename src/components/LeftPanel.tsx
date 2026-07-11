@@ -27,6 +27,10 @@ interface LeftPanelProps {
   scenes: SceneItem[]
   activeSceneId: string | null
   onSelectScene: (id: string) => void
+  onAddScene?: () => void
+  onRemoveScene?: (id: string) => void
+  onRenameScene?: (id: string, name: string) => void
+  onDuplicateScene?: (id: string) => void
   onAddMedia: () => void
   onSelectCharacter: (id: string) => void
   onImportMedia?: (file: File) => void
@@ -41,6 +45,10 @@ export default function LeftPanel({
   scenes,
   activeSceneId,
   onSelectScene,
+  onAddScene,
+  onRemoveScene,
+  onRenameScene,
+  onDuplicateScene,
   onAddMedia,
   onSelectCharacter,
   onImportMedia,
@@ -49,6 +57,20 @@ export default function LeftPanel({
   const [activeTab, setActiveTab] = useState<LeftTab>('media')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [editingSceneId, setEditingSceneId] = useState<string | null>(null)
+  const [editingSceneName, setEditingSceneName] = useState('')
+
+  const handleSceneRenameStart = (sceneId: string, currentName: string) => {
+    setEditingSceneId(sceneId)
+    setEditingSceneName(currentName)
+  }
+
+  const handleSceneRenameConfirm = () => {
+    if (editingSceneId && editingSceneName.trim() && onRenameScene) {
+      onRenameScene(editingSceneId, editingSceneName.trim())
+    }
+    setEditingSceneId(null)
+  }
 
   return (
     <div className="ymm4-left-panel">
@@ -171,10 +193,16 @@ export default function LeftPanel({
               <button
                 className="ymm4-toolbar-btn"
                 style={{ width: '100%', justifyContent: 'center', border: '1px dashed var(--ymm4-border)' }}
+                onClick={() => onAddScene?.()}
               >
                 ＋ シーンを追加
               </button>
             </div>
+            {scenes.length === 0 && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--ymm4-text-muted)', fontSize: 11 }}>
+                シーンがありません。「＋ シーンを追加」から作成
+              </div>
+            )}
             {scenes.map(scene => (
               <div
                 key={scene.id}
@@ -182,10 +210,50 @@ export default function LeftPanel({
                 onClick={() => onSelectScene(scene.id)}
               >
                 <span>🎬</span>
-                <span style={{ flex: 1 }}>{scene.name}</span>
+                {editingSceneId === scene.id ? (
+                  <input
+                    className="ymm4-settings-input"
+                    style={{ flex: 1, height: 22, fontSize: 11, margin: '0 4px' }}
+                    value={editingSceneName}
+                    onChange={e => setEditingSceneName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSceneRenameConfirm()
+                      if (e.key === 'Escape') setEditingSceneId(null)
+                    }}
+                    onBlur={handleSceneRenameConfirm}
+                    autoFocus
+                    onClick={e => e.stopPropagation()}
+                  />
+                ) : (
+                  <span
+                    style={{ flex: 1, cursor: 'pointer' }}
+                    onDoubleClick={() => handleSceneRenameStart(scene.id, scene.name)}
+                  >
+                    {scene.name}
+                  </span>
+                )}
                 <span style={{ fontSize: 10, color: 'var(--ymm4-text-muted)' }}>
                   {Math.floor(scene.duration / 30)}s
                 </span>
+                {/* Scene actions */}
+                {activeSceneId === scene.id && (
+                  <div style={{ display: 'flex', gap: 2, marginLeft: 4 }}>
+                    <span
+                      style={{ fontSize: 10, cursor: 'pointer', color: 'var(--ymm4-text-muted)', padding: '0 2px' }}
+                      onClick={e => { e.stopPropagation(); onDuplicateScene?.(scene.id) }}
+                      title="複製"
+                    >
+                      📋
+                    </span>
+                    <span
+                      style={{ fontSize: 10, cursor: 'pointer', color: '#e57373', padding: '0 2px' }}
+                      onClick={e => { e.stopPropagation(); onRemoveScene?.(scene.id) }}
+                      title={scenes.length <= 1 ? '最後のシーンは削除できません' : '削除'}
+                    >
+                      ✕
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
           </div>

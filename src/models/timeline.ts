@@ -87,12 +87,21 @@ export interface ProjectSettings {
   backgroundColor: string
 }
 
+/** シーン */
+export interface Scene {
+  id: string
+  name: string
+  tracks: Track[]
+}
+
 /** プロジェクト全体 */
 export interface Project {
   version: string
   name: string
   settings: ProjectSettings
   tracks: Track[]
+  scenes: Scene[]
+  activeSceneId: string
 }
 
 // ============================================================
@@ -126,6 +135,45 @@ export function formatTime(frame: number, fps: number): string {
 
 /** 新規プロジェクトを作成 */
 export function createDefaultProject(): Project {
+  const s1Id = generateId()
+  const tracks: Track[] = [
+    {
+      id: generateId(),
+      name: '動画トラック 1',
+      type: 'video',
+      index: 0,
+      mute: false,
+      solo: false,
+      locked: false,
+      visible: true,
+      volume: 1.0,
+      items: [],
+    },
+    {
+      id: generateId(),
+      name: '音声トラック 1',
+      type: 'audio',
+      index: 1,
+      mute: false,
+      solo: false,
+      locked: false,
+      visible: true,
+      volume: 1.0,
+      items: [],
+    },
+    {
+      id: generateId(),
+      name: 'テキストトラック 1',
+      type: 'text',
+      index: 2,
+      mute: false,
+      solo: false,
+      locked: false,
+      visible: true,
+      volume: 1.0,
+      items: [],
+    },
+  ]
   return {
     version: '1.0',
     name: '無題のプロジェクト',
@@ -133,48 +181,13 @@ export function createDefaultProject(): Project {
       width: 1920,
       height: 1080,
       fps: 30,
-      totalFrames: 9000, // 5分
+      totalFrames: 9000,
       audioSamplingRate: 48000,
       backgroundColor: '#1a1a2e',
     },
-    tracks: [
-      {
-        id: generateId(),
-        name: '動画トラック 1',
-        type: 'video',
-        index: 0,
-        mute: false,
-        solo: false,
-        locked: false,
-        visible: true,
-        volume: 1.0,
-        items: [],
-      },
-      {
-        id: generateId(),
-        name: '音声トラック 1',
-        type: 'audio',
-        index: 1,
-        mute: false,
-        solo: false,
-        locked: false,
-        visible: true,
-        volume: 1.0,
-        items: [],
-      },
-      {
-        id: generateId(),
-        name: 'テキストトラック 1',
-        type: 'text',
-        index: 2,
-        mute: false,
-        solo: false,
-        locked: false,
-        visible: true,
-        volume: 1.0,
-        items: [],
-      },
-    ],
+    tracks,
+    scenes: [{ id: s1Id, name: 'シーン 1', tracks: tracks.map(t => ({ ...t, items: [] })) }],
+    activeSceneId: s1Id,
   }
 }
 
@@ -215,6 +228,102 @@ const COLORS = [
 
 function getRandomColor(): string {
   return COLORS[Math.floor(Math.random() * COLORS.length)]
+}
+
+/** アクティブシーンのトラックを取得 */
+export function getActiveTracks(project: Project): Track[] {
+  const scene = project.scenes.find(s => s.id === project.activeSceneId)
+  if (scene) return scene.tracks
+  return project.tracks
+}
+
+/** アクティブシーンを取得 */
+export function getActiveScene(project: Project): Scene | null {
+  return project.scenes.find(s => s.id === project.activeSceneId) ?? null
+}
+
+/** アクティブシーンのトラックを更新し、project.tracksも同期 */
+export function updateActiveTracks(project: Project, updater: (tracks: Track[]) => Track[]): Project {
+  const activeScene = project.scenes.find(s => s.id === project.activeSceneId)
+  if (activeScene) {
+    const newTracks = updater(activeScene.tracks)
+    return {
+      ...project,
+      tracks: newTracks,
+      scenes: project.scenes.map(s => s.id === project.activeSceneId ? { ...s, tracks: newTracks } : s),
+    }
+  }
+  return { ...project, tracks: updater(project.tracks) }
+}
+
+/** シーンを追加 */
+export function addScene(project: Project, name?: string): Project {
+  const sceneTracks = project.tracks.map(t => ({
+    ...t,
+    items: [] as TimelineItem[],
+  }))
+  const scene: Scene = {
+    id: generateId(),
+    name: name || `シーン ${project.scenes.length + 1}`,
+    tracks: sceneTracks,
+  }
+  return {
+    ...project,
+    scenes: [...project.scenes, scene],
+    activeSceneId: scene.id,
+    tracks: sceneTracks,
+  }
+}
+
+/** シーンを削除 */
+export function removeScene(project: Project, sceneId: string): Project {
+  const remaining = project.scenes.filter(s => s.id !== sceneId)
+  if (remaining.length === 0) return project
+  const newActive = project.activeSceneId === sceneId ? remaining[remaining.length - 1].id : project.activeSceneId
+  const newScene = remaining.find(s => s.id === newActive)!
+  return {
+    ...project,
+    scenes: remaining,
+    activeSceneId: newActive,
+    tracks: newScene.tracks,
+  }
+}
+
+/** シーン名を変更 */
+export function renameScene(project: Project, sceneId: string, name: string): Project {
+  return {
+    ...project,
+    scenes: project.scenes.map(s => s.id === sceneId ? { ...s, name } : s),
+  }
+}
+
+/** シーンを複製 */
+export function duplicateScene(project: Project, sceneId: string): Project {
+  const source = project.scenes.find(s => s.id === sceneId)
+  if (!source) return project
+  const newScene: Scene = {
+    id: generateId(),
+    name: `${source.name} コピー`,
+    tracks: JSON.parse(JSON.stringify(source.tracks)),
+  }
+  return {
+    ...project,
+    scenes: [...project.scenes, newScene],
+    activeSceneId: newScene.id,
+    tracks: newScene.tracks,
+  }
+}
+
+/** シーンを切り替え */
+export function switchScene(project: Project, sceneId: string): Project {
+  if (project.activeSceneId === sceneId) return project
+  const target = project.scenes.find(s => s.id === sceneId)
+  if (!target) return project
+  return {
+    ...project,
+    activeSceneId: sceneId,
+    tracks: target.tracks,
+  }
 }
 
 /** トラックを追加 */
