@@ -3,12 +3,21 @@ dist/
 dist-electron/
 release/
 
+# MCP server build output
+mcp-server/dist/
+mcp-server/node_modules/
+
 # Generated icon PNGs (SVG is the source)
 buildResources/icon*.png
 !buildResources/icon.svg
 
-# IDE
+# IDE / OS
 .idea/
 .vscode/
 *.swp
 *.swo
+Thumbs.db
+.DS_Store
+
+# Temp / garbage
+nul

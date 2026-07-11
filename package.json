@@ -8,6 +8,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "build:mcp": "cd mcp-server && npm run build",
+    "postinstall": "cd mcp-server && npm install --no-audit --no-fund 2>nul || echo mcp-server dependencies skipped",
     "icon": "node scripts/generate-icon.mjs",
     "package": "npm run icon && npm run build && electron-builder --win",
     "package:portable": "npm run icon && npm run build && electron-builder --win --config.win.target=portable --config.win.signAndEditExecutable=false",

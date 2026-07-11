@@ -103,10 +103,10 @@ export default function Timeline({
     canvas.style.height = `${RULER_HEIGHT}px`
     ctx.scale(dpr, dpr)
 
-    ctx.fillStyle = '#1a1a2e'
+    ctx.fillStyle = '#1f1e1b'
     ctx.fillRect(0, 0, width, RULER_HEIGHT)
 
-    ctx.strokeStyle = '#2a2a44'
+    ctx.strokeStyle = '#252320'
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.moveTo(0, RULER_HEIGHT - 0.5)
@@ -140,7 +140,7 @@ export default function Timeline({
       const isHalf = f % (frameInterval / 2) === 0
 
       if (isSecond) {
-        ctx.strokeStyle = '#3a3a54'
+        ctx.strokeStyle = '#3d3d3a'
         ctx.lineWidth = 1
         ctx.beginPath()
         ctx.moveTo(x, 16)
@@ -151,14 +151,14 @@ export default function Timeline({
         const remainingSec = sec % 60
         ctx.fillText(`${min}:${remainingSec.toString().padStart(2, '0')}`, x, 12)
       } else if (isHalf) {
-        ctx.strokeStyle = '#2a2a44'
+        ctx.strokeStyle = '#252320'
         ctx.lineWidth = 1
         ctx.beginPath()
         ctx.moveTo(x, 20)
         ctx.lineTo(x, RULER_HEIGHT)
         ctx.stroke()
       } else {
-        ctx.strokeStyle = '#1e1e36'
+        ctx.strokeStyle = '#2a2a28'
         ctx.lineWidth = 1
         ctx.beginPath()
         ctx.moveTo(x, 24)
@@ -191,22 +191,22 @@ export default function Timeline({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     // Clear
-    ctx.fillStyle = '#0f0f1a'
+    ctx.fillStyle = '#181715'
     ctx.fillRect(0, 0, cw, ch)
 
     project.tracks.forEach((track, index) => {
       const y = index * TRACK_HEIGHT
       const isEven = index % 2 === 0
 
-      ctx.fillStyle = isEven ? '#13132a' : '#111122'
+      ctx.fillStyle = isEven ? '#1b1a18' : '#181715'
       ctx.fillRect(0, y, cw, TRACK_HEIGHT)
 
       if (hoveredTrackIndex === index) {
-        ctx.fillStyle = 'rgba(124, 77, 255, 0.08)'
+        ctx.fillStyle = 'rgba(204, 120, 92, 0.08)'
         ctx.fillRect(0, y, cw, TRACK_HEIGHT)
       }
 
-      ctx.strokeStyle = '#1e1e36'
+      ctx.strokeStyle = '#252320'
       ctx.lineWidth = 1
       ctx.beginPath()
       ctx.moveTo(0, y + TRACK_HEIGHT - 0.5)
@@ -259,6 +259,7 @@ export default function Timeline({
           ctx.textBaseline = 'middle'
           const icon = item.type === 'video' ? '🎬' : item.type === 'audio' ? '🎵' : item.type === 'text' ? 'Ｔ' : '🖼'
           const label = item.name.length > 12 ? item.name.substring(0, 11) + '…' : item.name
+          ctx.fillStyle = '#faf9f5'
           ctx.fillText(`${icon} ${label}`, itemX + 8, itemY + itemH / 2)
         }
 
@@ -266,7 +267,7 @@ export default function Timeline({
           const df = item.endFrame - item.startFrame
           const ds = (df / project.settings.fps).toFixed(1)
           ctx.font = '9px Consolas, monospace'
-          ctx.fillStyle = '#6a6a80'
+          ctx.fillStyle = '#a09d96'
           ctx.textAlign = 'right'
           ctx.fillText(`${df}f (${ds}s)`, itemX + itemW - 6, itemY + itemH / 2)
         }
@@ -276,14 +277,14 @@ export default function Timeline({
     // Playhead
     const phX = currentFrame * scale - scrollLeft
     if (phX >= 0 && phX <= cw) {
-      ctx.strokeStyle = '#ff5252'
+      ctx.strokeStyle = '#cc785c'
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.moveTo(phX, 0)
       ctx.lineTo(phX, ch)
       ctx.stroke()
 
-      ctx.fillStyle = '#ff5252'
+      ctx.fillStyle = '#cc785c'
       ctx.beginPath()
       ctx.moveTo(phX - 5, 0)
       ctx.lineTo(phX + 5, 0)
@@ -292,7 +293,7 @@ export default function Timeline({
       ctx.fill()
 
       ctx.font = '10px Consolas, monospace'
-      ctx.fillStyle = '#ff5252'
+      ctx.fillStyle = '#cc785c'
       ctx.textAlign = 'center'
       ctx.fillText(`f${currentFrame}`, phX, ch - 6)
     }
@@ -491,7 +492,7 @@ export default function Timeline({
       <div className="timeline-header">
         <div className="track-list-header" style={{ width: TRACK_LIST_WIDTH }}>
           <span>トラック</span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 11, color: '#a09d96' }}>
             {project.tracks.length} トラック
           </span>
         </div>
@@ -562,7 +563,7 @@ export default function Timeline({
         <div className="timeline-footer-info">
           <span>ダブルクリックでクリップ追加</span>
           <span style={{ marginLeft: 16 }}>全 {clipCount} クリップ</span>
-          {selectedItemId && <span style={{ marginLeft: 16, color: '#7c4dff' }}>選択中</span>}
+          {selectedItemId &&          <span style={{ marginLeft: 16, color: '#cc785c' }}>選択中</span>}
         </div>
       </div>
     </div>

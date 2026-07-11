@@ -1,5 +1,5 @@
 /* ============================================================
-   Timeline Component Styles
+   Timeline — Dark Navy Surface (Claude code-window style)
    ============================================================ */
 
 .timeline-container {
@@ -7,15 +7,14 @@
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  background: var(--bg-primary);
-  border-top: 1px solid var(--border-color);
+  background: var(--claude-surface-dark);
 }
 
-/* Header: Track list title + Ruler */
+/* ---- Header ---- */
 .timeline-header {
   display: flex;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--claude-surface-dark-elevated);
   height: 32px;
 }
 
@@ -23,13 +22,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  padding: 0 var(--space-sm);
+  background: var(--claude-surface-dark-soft);
+  border-right: 1px solid var(--claude-surface-dark-elevated);
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 500;
+  color: var(--claude-on-dark-soft);
   flex-shrink: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .ruler-container {
@@ -37,41 +38,42 @@
   overflow: hidden;
   position: relative;
   cursor: pointer;
+  background: var(--claude-surface-dark);
 }
 
 .ruler-canvas {
   display: block;
 }
 
-/* Body: Track list + Canvas */
+/* ---- Body ---- */
 .timeline-body {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
-/* Track List (Left) */
+/* ---- Track List (Left) ---- */
 .track-list {
   flex-shrink: 0;
   overflow: hidden;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  background: var(--claude-surface-dark-soft);
+  border-right: 1px solid var(--claude-surface-dark-elevated);
 }
 
 .track-list-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px 0 12px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-secondary);
+  padding: 0 var(--space-xs) 0 var(--space-sm);
+  border-bottom: 1px solid var(--claude-surface-dark-elevated);
+  background: var(--claude-surface-dark-soft);
   transition: background 0.1s;
   cursor: pointer;
   gap: 4px;
 }
 
 .track-list-item:hover {
-  background: var(--bg-hover);
+  background: var(--claude-surface-dark-elevated);
 }
 
 .track-list-name {
@@ -85,14 +87,16 @@
 .track-list-icon {
   font-size: 12px;
   flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .track-list-title {
-  font-size: 11px;
-  color: var(--text-primary);
+  font-size: 12px;
+  color: var(--claude-on-dark);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 400;
 }
 
 .track-list-controls {
@@ -108,23 +112,26 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  color: var(--text-muted);
-  border-radius: 3px;
+  color: var(--claude-on-dark-soft);
+  border-radius: 4px;
   transition: all 0.1s;
   font-size: 11px;
+  opacity: 0.6;
 }
 
 .track-btn:hover {
-  background: var(--bg-surface);
-  color: var(--text-primary);
+  background: var(--claude-surface-dark);
+  color: var(--claude-on-dark);
+  opacity: 1;
 }
 
 .track-btn.active {
-  background: rgba(255, 82, 82, 0.15);
-  color: #ff5252;
+  background: rgba(198, 69, 69, 0.2);
+  color: #c64545;
+  opacity: 1;
 }
 
-/* Scrollable canvas area */
+/* ---- Scrollable Canvas Area ---- */
 .timeline-scroll {
   flex: 1;
   overflow: auto;
@@ -137,17 +144,17 @@
 }
 
 .timeline-scroll::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: var(--claude-surface-dark);
 }
 
 .timeline-scroll::-webkit-scrollbar-thumb {
-  background: var(--border-light);
+  background: var(--claude-surface-dark-elevated);
   border-radius: 5px;
-  border: 2px solid var(--bg-primary);
+  border: 2px solid var(--claude-surface-dark);
 }
 
 .timeline-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--claude-muted);
 }
 
 .timeline-canvas {
@@ -155,14 +162,14 @@
   cursor: crosshair;
 }
 
-/* Footer: Zoom controls */
+/* ---- Footer ---- */
 .timeline-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 16px;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
+  padding: 4px var(--space-md);
+  background: var(--claude-surface-dark-soft);
+  border-top: 1px solid var(--claude-surface-dark-elevated);
   height: 32px;
   flex-shrink: 0;
 }
@@ -170,16 +177,21 @@
 .timeline-footer .zoom-control {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 
 .timeline-footer .zoom-slider {
   width: 120px;
   height: 4px;
   -webkit-appearance: none;
-  background: var(--border-light);
+  background: var(--claude-surface-dark-elevated);
   border-radius: 2px;
   outline: none;
+  border: none;
+}
+
+.timeline-footer .zoom-slider:focus {
+  box-shadow: none;
 }
 
 .timeline-footer .zoom-slider::-webkit-slider-thumb {
@@ -187,9 +199,10 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--accent-primary);
+  background: var(--claude-primary);
   cursor: pointer;
   transition: transform 0.1s;
+  border: none;
 }
 
 .timeline-footer .zoom-slider::-webkit-slider-thumb:hover {
@@ -197,11 +210,14 @@
 }
 
 .timeline-footer .zoom-label {
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: var(--claude-on-dark-soft);
 }
 
 .timeline-footer-info {
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: var(--claude-on-dark-soft);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
 }
