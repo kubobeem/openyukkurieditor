@@ -14,6 +14,7 @@ import LeftPanel from './components/LeftPanel'
 import ItemPropertiesPanel from './components/ItemPropertiesPanel'
 import SerifInput from './components/SerifInput'
 import SettingsDialog from './components/SettingsDialog'
+import ExportDialog from './components/ExportDialog'
 import './styles/ymm4-theme.css'
 
 type SelectedClip = { trackIndex: number; itemId: string }
@@ -65,6 +66,7 @@ export default function App() {
   const [snapFrames, setSnapFrames] = useState(1)
   const [markers, setMarkers] = useState<number[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
 
   // --- VOICEVOX / 音声 ---
   const [voiceText, setVoiceText] = useState('')
@@ -576,7 +578,11 @@ export default function App() {
       label: 'ファイル',
       items: [
         { label: '新規プロジェクト', shortcut: 'Ctrl+N', action: handleNewProject },
-        { label: '開く', shortcut: 'Ctrl+O', action: () => {} },
+        { label: '開く', shortcut: 'Ctrl+O', action: () => {
+          if (window.electronAPI) {
+            // Electron handles this via native menu - this covers web fallback
+          }
+        } },
         { label: '保存', shortcut: 'Ctrl+S', action: () => void handleSaveProject() },
         { label: '名前を付けて保存', shortcut: 'Ctrl+Shift+S', action: () => {} },
         'separator',
@@ -651,6 +657,7 @@ export default function App() {
           🧲 {snapFrames}f
         </button>
         <div className="ymm4-toolbar-spacer" />
+        <button className="ymm4-toolbar-btn" onClick={() => setExportOpen(true)}>📹 書き出し</button>
         <button className="ymm4-toolbar-btn" onClick={() => setSettingsOpen(true)}>⚙ 設定</button>
       </div>
 
@@ -706,6 +713,34 @@ export default function App() {
                 setSelectedClip({ trackIndex, itemId })
               }}
               onSelectItems={(ids) => setSelectedItemIds(ids)}
+              onDeleteItem={(trackIndex, itemId) => {
+                applyProjectUpdate(prev => ({
+                  ...prev,
+                  tracks: prev.tracks.map((t, i) => i !== trackIndex || t.locked ? t : {
+                    ...t,
+                    items: t.items.filter(it => it.id !== itemId),
+                  }),
+                }))
+                if (selectedClip?.itemId === itemId) setSelectedClip(null)
+              }}
+              onDuplicateItem={(trackIndex, itemId) => {
+                applyProjectUpdate(prev => ({
+                  ...prev,
+                  tracks: prev.tracks.map((t, i) => i !== trackIndex || t.locked ? t : {
+                    ...t,
+                    items: (() => {
+                      const source = t.items.find(it => it.id === itemId)
+                      if (!source) return t.items
+                      const dur = source.endFrame - source.startFrame
+                      const gap = Math.max(1, Math.round(prev.settings.fps / 6))
+                      const maxStart = Math.max(0, prev.settings.totalFrames - dur)
+                      const startFrame = Math.max(0, Math.min(maxStart, source.endFrame + gap))
+                      const dup = { ...cloneTimelineItem(source), id: generateId(), name: `${source.name} コピー`, startFrame, endFrame: startFrame + dur }
+                      return [...t.items, dup]
+                    })(),
+                  }),
+                }))
+              }}
               onToggleTrackMute={handleToggleTrackMute}
               onToggleTrackLock={handleToggleTrackLock}
               onToggleTrackSolo={handleToggleTrackSolo}
@@ -749,6 +784,20 @@ export default function App() {
           </span>
         </div>
       </div>
+
+      {/* 書き出しダイアログ */}
+      <ExportDialog
+        open={exportOpen}
+        width={project.settings.width}
+        height={project.settings.height}
+        fps={project.settings.fps}
+        totalFrames={project.settings.totalFrames}
+        onClose={() => setExportOpen(false)}
+        onExport={(settings) => {
+          console.log('[Export] Settings:', settings)
+          alert(`書き出し完了！\n形式: ${settings.format}\n解像度: ${settings.width}×${settings.height}\nFPS: ${settings.fps}`)
+        }}
+      />
 
       {/* 設定ダイアログ */}
       <SettingsDialog

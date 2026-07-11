@@ -33,6 +33,12 @@ const BUILTIN_EFFECTS = [
   { name: 'クロマキー', params: { color: '#00ff00', threshold: 0.3, softness: 0.1 } },
   { name: 'グロー', params: { radius: 10, intensity: 0.5, threshold: 0.8 } },
   { name: 'モザイク', params: { blockSize: 10 } },
+  { name: '光彩（外側）', params: { radius: 8, color: '#ffffff', opacity: 0.6 } },
+  { name: '光彩（内側）', params: { radius: 5, color: '#ffffff', opacity: 0.4 } },
+  { name: '縁取り', params: { width: 2, color: '#000000', opacity: 1.0 } },
+  { name: 'ドロップシャドウ', params: { blur: 6, offsetX: 3, offsetY: 3, opacity: 0.5, color: '#000000' } },
+  { name: 'グラデーション', params: { startColor: '#ff0000', endColor: '#0000ff', angle: 90, opacity: 0.3 } },
+  { name: '拡大鏡', params: { radius: 60, zoom: 2.0 } },
 ] as const
 
 function PropertyRow({
@@ -278,6 +284,20 @@ export default function ItemPropertiesPanel({
           <PropertyRow label="回転" value={item.transform.rotation} onChange={v => onUpdateItem({ transform: { ...item.transform, rotation: v } })} step={0.1} min={-360} max={360} />
           <PropertyRow label="不透明度" value={item.opacity} onChange={v => onUpdateItem({ opacity: Math.max(0, Math.min(1, v)) })} step={0.01} min={0} max={1} />
           <PropertyRow label="音量" value={item.volume} onChange={v => onUpdateItem({ volume: Math.max(0, Math.min(2, v)) })} step={0.01} min={0} max={2} />
+          {/* カラーピッカー */}
+          <div className="ymm4-property-row">
+            <span className="ymm4-property-label">色</span>
+            <input
+              className="ymm4-property-input"
+              type="color"
+              value={item.color || '#4fc3f7'}
+              style={{ padding: 0, height: 24, width: 60, cursor: 'pointer' }}
+              onChange={e => onUpdateItem({ color: e.target.value })}
+            />
+            <span style={{ fontSize: 10, color: 'var(--ymm4-text-muted)', fontFamily: 'Consolas, monospace' }}>
+              {item.color || '#4fc3f7'}
+            </span>
+          </div>
         </div>
       </div>
 

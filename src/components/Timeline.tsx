@@ -17,6 +17,8 @@ interface TimelineProps {
   selectedItemIds: string[]
   onSelectItem: (trackIndex: number, itemId: string | null) => void
   onSelectItems: (itemIds: string[]) => void
+  onDeleteItem?: (trackIndex: number, itemId: string) => void
+  onDuplicateItem?: (trackIndex: number, itemId: string) => void
   onToggleTrackMute: (trackIndex: number) => void
   onToggleTrackLock: (trackIndex: number) => void
   onToggleTrackSolo: (trackIndex: number) => void
@@ -65,6 +67,8 @@ export default function Timeline({
   onSelectItem,
   onSelectItems,
   onMoveItemToTrack,
+  onDeleteItem,
+  onDuplicateItem,
   onToggleTrackMute,
   onToggleTrackLock,
   onToggleTrackSolo,
@@ -296,6 +300,25 @@ export default function Timeline({
         roundRect(ctx, itemX + itemW - 3, y + 2, 3, TRACK_HEIGHT - 4, 1)
         ctx.fillStyle = color
         ctx.fill()
+
+        // Audio waveform (simulated for audio-type items)
+        if (item.type === 'audio' && itemW > 40) {
+          const waveformColor = color + '66'
+          ctx.strokeStyle = waveformColor
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          const waveHeight = itemH * 0.3
+          const waveMid = itemY + itemH / 2
+          for (let px = 0; px < itemW; px += 1) {
+            const t = px / itemW
+            const amp = (0.3 + 0.7 * (1 - Math.abs(t - 0.5) * 2)) * waveHeight
+            const y1 = waveMid + Math.sin(t * 120 + 0.5) * amp * 0.3
+            const y2 = waveMid + Math.sin(t * 120 + 1.5) * amp * 0.3
+            ctx.moveTo(itemX + px, y1)
+            ctx.lineTo(itemX + px, y2)
+          }
+          ctx.stroke()
+        }
 
         // Labels
         if (itemW > 60) {
@@ -640,6 +663,43 @@ export default function Timeline({
   }, [])
 
   // Scroll wheel zoom
+  // Right-click context menu
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; trackIndex: number; itemId: string | null } | null>(null)
+
+  const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const mx = e.clientX - rect.left
+    const my = e.clientY - rect.top
+    const hit = findItemAt(mx, my)
+    const ti = Math.floor(my / TRACK_HEIGHT)
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      trackIndex: ti >= 0 && ti < project.tracks.length ? ti : 0,
+      itemId: hit?.item.id ?? null,
+    })
+  }, [findItemAt, project.tracks.length])
+
+  const handleContextMenuAction = useCallback((action: string) => {
+    const menu = contextMenu
+    setContextMenu(null)
+    if (!menu || !menu.itemId) return
+    if (action === 'delete') {
+      onDeleteItem?.(menu.trackIndex, menu.itemId)
+    } else if (action === 'duplicate') {
+      onDuplicateItem?.(menu.trackIndex, menu.itemId)
+    }
+  }, [contextMenu, onDeleteItem, onDuplicateItem])
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu) return
+    const close = () => setContextMenu(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [contextMenu])
+
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
@@ -744,6 +804,7 @@ export default function Timeline({
               onMouseLeave={handleCanvasMouseLeave}
               onClick={handleCanvasClick}
               onDoubleClick={handleCanvasDoubleClick}
+              onContextMenu={handleCanvasContextMenu}
               onWheel={handleWheel}
               style={{ width: totalWidth, height: totalHeight }}
             />
@@ -775,6 +836,40 @@ export default function Timeline({
           {selectedItemIds.length > 0 && <span style={{ marginLeft: 16, color: '#cc785c' }}>{selectedItemIds.length}個選択</span>}
         </div>
       </div>
+
+      {/* 右クリックコンテキストメニュー */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            background: 'var(--ymm4-bg-panel)',
+            border: '1px solid var(--ymm4-border)',
+            borderRadius: 4,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            zIndex: 3000,
+            padding: '4px 0',
+            minWidth: 160,
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {contextMenu.itemId && (
+            <>
+              <div className="ymm4-dropdown-item" onClick={() => handleContextMenuAction('duplicate')}>
+                複製
+              </div>
+              <div className="ymm4-dropdown-item" onClick={() => handleContextMenuAction('delete')}>
+                削除
+              </div>
+              <div className="ymm4-dropdown-separator" />
+            </>
+          )}
+          <div className="ymm4-dropdown-item" onClick={() => { setContextMenu(null) }}>
+            キャンセル
+          </div>
+        </div>
+      )}
     </div>
   )
 }
