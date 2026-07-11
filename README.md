@@ -39,7 +39,7 @@ npm run package:portable
 
 ## ライセンス
 
-MIT License
+Apache License 2.0
 
 ---
 
