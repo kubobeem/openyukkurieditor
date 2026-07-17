@@ -5,6 +5,7 @@ import { parseYmmp, serializeYmmp } from './parsers/ymmp'
 import { pluginManager } from './plugin/manager'
 import { registerBuiltinEffects } from './engine/effect/effects/effects-index'
 import { VoiceEngineManager } from './engine/voice/manager'
+import { mediaManager } from './engine/media/manager'
 import { AviUtlInterpreter, ScriptFrameState } from './engine/script/aviutl-interpreter'
 import { EffectPipeline } from './engine/effect/pipeline'
 import Timeline from './components/Timeline'
@@ -127,7 +128,7 @@ export default function App() {
     return () => pluginManager.destroyAll()
   }, [])
 
-  useEffect(() => { return () => voiceEngine.dispose() }, [])
+  useEffect(() => { return () => { voiceEngine.dispose(); mediaManager.dispose() } }, [])
 
   // --- 音声エンジン検出 ---
   useEffect(() => {
@@ -598,15 +599,35 @@ export default function App() {
 
   // --- 再生ループ ---
   useEffect(() => {
-    if (!isPlaying) { lastTickRef.current = 0; return }
+    if (!isPlaying) { lastTickRef.current = 0; mediaManager.stopAllAudio(); return }
     const fps = project.settings.fps; const interval = 1000 / fps
+    const playedClips = new Set<string>()
     lastTickRef.current = performance.now()
+
+    // 直近のフレームより先にある音声クリップをキューする
+    const playAudioAtFrame = (frame: number) => {
+      for (const track of projectRef.current.tracks) {
+        if (track.mute) continue
+        for (const item of track.items) {
+          if (item.type !== 'audio' && item.type !== 'voice') continue
+          if (playedClips.has(item.id)) continue
+          if (item.sourcePath && frame >= item.startFrame && frame < item.endFrame) {
+            const startSec = (frame - item.startFrame) / fps
+            const durSec = (item.endFrame - item.startFrame) / fps
+            mediaManager.playAudio(item.sourcePath, startSec, durSec, item.volume * track.volume)
+            playedClips.add(item.id)
+          }
+        }
+      }
+    }
+
     const tick = (now: number) => {
       const delta = now - lastTickRef.current
       if (delta >= interval) {
         lastTickRef.current = now - (delta % interval)
         setCurrentFrame(prev => {
           const next = prev + Math.floor(delta / interval)
+          playAudioAtFrame(next)
           if (next >= project.settings.totalFrames) { setIsPlaying(false); return 0 }
           return next
         })
@@ -885,6 +906,7 @@ export default function App() {
               project={project}
               currentFrame={currentFrame}
               selectedItemId={selectedClip?.itemId ?? null}
+              isPlaying={isPlaying}
             />
           </div>
 
