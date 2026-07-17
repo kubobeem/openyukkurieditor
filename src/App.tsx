@@ -692,12 +692,26 @@ export default function App() {
     setSelectedItemIds([])
   }, [applyProjectUpdate, project.activeSceneId])
 
-  // --- ダミーデータ ---
-  const mediaItems = [
-    { id: 'm1', name: 'サンプル動画.mp4', type: 'video' as const, icon: '🎬' },
-    { id: 'm2', name: 'サンプル音声.wav', type: 'audio' as const, icon: '🎵' },
-    { id: 'm3', name: 'サンプル画像.png', type: 'image' as const, icon: '🖼' },
-  ]
+  // --- メディア管理 ---
+  interface MediaEntry { id: string; name: string; type: 'video' | 'audio' | 'image'; icon: string; path?: string }
+  const [mediaItems, setMediaItems] = useState<MediaEntry[]>([
+    { id: 'm1', name: 'サンプル動画.mp4', type: 'video', icon: '🎬' },
+    { id: 'm2', name: 'サンプル音声.wav', type: 'audio', icon: '🎵' },
+    { id: 'm3', name: 'サンプル画像.png', type: 'image', icon: '🖼' },
+  ])
+
+  const importMediaFile = useCallback((file: File, filePath?: string) => {
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    let type: 'video' | 'audio' | 'image' = 'video'
+    let icon = '🎬'
+    if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(ext || '')) { type = 'audio'; icon = '🎵' }
+    else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico'].includes(ext || '')) { type = 'image'; icon = '🖼' }
+    else if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'wmv'].includes(ext || '')) { type = 'video'; icon = '🎬' }
+    setMediaItems(prev => {
+      if (prev.some(m => m.name === file.name)) return prev
+      return [...prev, { id: generateId(), name: file.name, type, icon, path: filePath || file.name }]
+    })
+  }, [])
 
   const characters = [
     { id: 'default', name: 'デフォルト', engine: 'voicevox', avatar: '😀', available: true },
@@ -845,22 +859,12 @@ export default function App() {
           onDuplicateScene={handleDuplicateScene}
           onAddMedia={() => {}}
           onSelectCharacter={setCurrentCharacterId}
-          onImportMedia={(file) => {
-            const ext = file.name.split('.').pop()?.toLowerCase()
-            let type: 'video' | 'audio' | 'image' = 'video'
-            if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext || '')) type = 'audio'
-            else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext || '')) type = 'image'
-            console.log(`[Import] ${file.name} (${type})`)
-          }}
+          onImportMedia={(file) => importMediaFile(file)}
           onDropMedia={(files) => {
-            for (let i = 0; i < files.length; i++) {
-              const f = files[i]
-              const ext = f.name.split('.').pop()?.toLowerCase()
-              let type: 'video' | 'audio' | 'image' = 'video'
-              if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext || '')) type = 'audio'
-              else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext || '')) type = 'image'
-              console.log(`[Import] ${f.name} (${type})`)
-            }
+            for (let i = 0; i < files.length; i++) importMediaFile(files[i])
+          }}
+          mediaItemOnDragStart={(id, name, type) => {
+            (window as any).__dragMedia = { id, name, type }
           }}
         />
 
@@ -947,6 +951,31 @@ export default function App() {
               onToggleTrackLock={handleToggleTrackLock}
               onToggleTrackSolo={handleToggleTrackSolo}
               onChangeTrackColor={handleChangeTrackColor}
+              onDropMediaItem={(trackIndex, mediaName, mediaType, startFrame) => {
+                const duration = project.settings.fps * 5
+                const itemType = mediaType === 'audio' ? 'audio' as const : mediaType === 'image' ? 'image' as const : 'video' as const
+                applyProjectUpdate(prev => ({
+                  ...prev,
+                  tracks: prev.tracks.map((t, i) => i !== trackIndex || t.locked ? t : {
+                    ...t,
+                    items: [...t.items, {
+                      id: generateId(),
+                      name: mediaName,
+                      type: itemType,
+                      sourcePath: mediaName,
+                      startFrame,
+                      endFrame: startFrame + duration,
+                      layer: 0,
+                      opacity: 1,
+                      volume: 1,
+                      transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+                      effects: [],
+                      keyframes: [],
+                      color: ['#4fc3f7', '#81c784', '#ffb74d', '#e57373', '#ba68c8'][t.items.length % 5],
+                    }],
+                  }),
+                }))
+              }}
             />
           </div>
           {/* タイムラインリサイズハンドル（下部） */}

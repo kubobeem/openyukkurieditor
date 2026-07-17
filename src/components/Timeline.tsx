@@ -25,6 +25,7 @@ interface TimelineProps {
   onToggleTrackLock: (trackIndex: number) => void
   onToggleTrackSolo: (trackIndex: number) => void
   onChangeTrackColor?: (trackIndex: number, color: string) => void
+  onDropMediaItem?: (trackIndex: number, mediaName: string, mediaType: string, startFrame: number) => void
 }
 
 const DEFAULT_SCALE = 8
@@ -78,6 +79,7 @@ export default function Timeline({
   onToggleTrackLock,
   onToggleTrackSolo,
   onChangeTrackColor,
+  onDropMediaItem,
 }: TimelineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rulerRef = useRef<HTMLCanvasElement>(null)
@@ -88,6 +90,7 @@ export default function Timeline({
   const [scrollLeft, setScrollLeft] = useState(0)
   const [hoveredTrackIndex, setHoveredTrackIndex] = useState<number | null>(null)
   const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const [dropIndicator, setDropIndicator] = useState<{ x: number; trackIndex: number } | null>(null)
 
   // Drag state
   const dragRef = useRef<{
@@ -419,7 +422,20 @@ export default function Timeline({
       ctx.textAlign = 'center'
       ctx.fillText(`f${currentFrame}`, phX, ch - 6)
     }
-  },    [project, currentFrame, scale, scrollLeft, markers, hoveredTrackIndex, selectedItemId, marqueeRect, selectedItemIds])
+
+    // Drop indicator
+    if (dropIndicator) {
+      const dx = dropIndicator.x - scrollLeft
+      const dy = dropIndicator.trackIndex * TRACK_HEIGHT
+      ctx.fillStyle = 'rgba(204, 120, 92, 0.2)'
+      ctx.fillRect(dx, dy, 4, TRACK_HEIGHT)
+      ctx.strokeStyle = '#cc785c'
+      ctx.lineWidth = 2
+      ctx.setLineDash([4, 3])
+      ctx.strokeRect(dx - 2, dy, 4, TRACK_HEIGHT)
+      ctx.setLineDash([])
+    }
+  },    [project, currentFrame, scale, scrollLeft, markers, hoveredTrackIndex, selectedItemId, marqueeRect, selectedItemIds, dropIndicator])
 
   // Redraw using requestAnimationFrame
   const scheduleDraw = useCallback(() => {
@@ -752,6 +768,56 @@ export default function Timeline({
     [project.tracks, onAddClip],
   )
 
+  // --- メディアドロップ ---
+  const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    const rect = e.currentTarget.getBoundingClientRect()
+    const my = e.clientY - rect.top
+    const mx = e.clientX - rect.left + scrollLeft
+    const ti = Math.floor(my / TRACK_HEIGHT)
+    if (ti >= 0 && ti < project.tracks.length && !project.tracks[ti].locked) {
+      setDropIndicator({ x: mx, trackIndex: ti })
+      scheduleDraw()
+    } else {
+      setDropIndicator(null)
+    }
+  }, [project.tracks, scrollLeft, scheduleDraw])
+
+  const handleCanvasDragLeave = useCallback(() => {
+    setDropIndicator(null)
+    scheduleDraw()
+  }, [scheduleDraw])
+
+  const handleCanvasDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDropIndicator(null)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const mx = e.clientX - rect.left + scrollLeft
+    const my = e.clientY - rect.top
+    const ti = Math.floor(my / TRACK_HEIGHT)
+    if (ti < 0 || ti >= project.tracks.length || project.tracks[ti].locked) return
+
+    // メディアパネルからのドラッグ
+    const dragData = (window as any).__dragMedia
+    if (dragData && onDropMediaItem) {
+      const frame = Math.max(0, Math.min(project.settings.totalFrames - 1, Math.round(mx / scale)))
+      onDropMediaItem(ti, dragData.name, dragData.type, frame)
+      return
+    }
+
+    // 外部ファイルのドロップ
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      const ext = files[0].name.split('.').pop()?.toLowerCase()
+      let mediaType = 'video'
+      if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(ext || '')) mediaType = 'audio'
+      else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext || '')) mediaType = 'image'
+      const frame = Math.max(0, Math.min(project.settings.totalFrames - 1, Math.round(mx / scale)))
+      onDropMediaItem?.(ti, files[0].name, mediaType, frame)
+    }
+  }, [project.tracks, project.settings.totalFrames, scale, onDropMediaItem])
+
   const handleZoomChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setScale(Number(e.target.value))
   }, [])
@@ -917,6 +983,9 @@ export default function Timeline({
               onDoubleClick={handleCanvasDoubleClick}
               onContextMenu={handleCanvasContextMenu}
               onWheel={handleWheel}
+              onDragOver={handleCanvasDragOver}
+              onDragLeave={handleCanvasDragLeave}
+              onDrop={handleCanvasDrop}
               style={{ width: totalWidth, height: totalHeight }}
             />
           </div>

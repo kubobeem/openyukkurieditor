@@ -35,6 +35,7 @@ interface LeftPanelProps {
   onSelectCharacter: (id: string) => void
   onImportMedia?: (file: File) => void
   onDropMedia?: (files: FileList) => void
+  mediaItemOnDragStart?: (id: string, name: string, type: string) => void
 }
 
 type LeftTab = 'media' | 'characters' | 'scenes'
@@ -53,6 +54,7 @@ export default function LeftPanel({
   onSelectCharacter,
   onImportMedia,
   onDropMedia,
+  mediaItemOnDragStart,
 }: LeftPanelProps) {
   const [activeTab, setActiveTab] = useState<LeftTab>('media')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -154,7 +156,16 @@ export default function LeftPanel({
               </div>
             )}
             {mediaItems.map(item => (
-              <div key={item.id} className="ymm4-media-item" draggable>
+              <div
+                key={item.id}
+                className="ymm4-media-item"
+                draggable
+                onDragStart={e => {
+                  e.dataTransfer.setData('text/plain', item.name)
+                  e.dataTransfer.effectAllowed = 'copy'
+                  mediaItemOnDragStart?.(item.id, item.name, item.type)
+                }}
+              >
                 <span className="media-icon">{item.icon}</span>
                 <span className="media-name">{item.name}</span>
               </div>
