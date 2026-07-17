@@ -700,16 +700,17 @@ export default function App() {
     { id: 'm3', name: 'サンプル画像.png', type: 'image', icon: '🖼' },
   ])
 
-  const importMediaFile = useCallback((file: File, filePath?: string) => {
+  const importMediaFile = useCallback((file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase()
     let type: 'video' | 'audio' | 'image' = 'video'
     let icon = '🎬'
     if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(ext || '')) { type = 'audio'; icon = '🎵' }
     else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico'].includes(ext || '')) { type = 'image'; icon = '🖼' }
     else if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'wmv'].includes(ext || '')) { type = 'video'; icon = '🎬' }
+    const filePath = (file as any).path || file.name
     setMediaItems(prev => {
-      if (prev.some(m => m.name === file.name)) return prev
-      return [...prev, { id: generateId(), name: file.name, type, icon, path: filePath || file.name }]
+      if (prev.some(m => m.name === file.name && m.path === filePath)) return prev
+      return [...prev, { id: generateId(), name: file.name, type, icon, path: filePath }]
     })
   }, [])
 
