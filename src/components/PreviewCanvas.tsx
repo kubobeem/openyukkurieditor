@@ -336,7 +336,7 @@ export default function PreviewCanvas({
         ctx.stroke()
 
         // Type icon
-        const icon = item.type === 'video' ? '🎬' : '🖼'
+        const icon = item.type === 'video' ? '🎬' : item.type === 'image' ? '🖼' : '📄'
         ctx.font = `${Math.max(10, Math.round(14 * sx))}px sans-serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
@@ -347,6 +347,14 @@ export default function PreviewCanvas({
         ctx.font = `${Math.max(8, Math.round(10 * sx))}px sans-serif`
         ctx.fillStyle = 'rgba(255,255,255,0.6)'
         ctx.fillText(item.name.length > 10 ? item.name.substring(0, 9) + '…' : item.name, 0, halfH * 0.4)
+
+        // Source path (short)
+        if (item.sourcePath) {
+          ctx.font = `${Math.max(6, Math.round(7 * sx))}px Consolas, monospace`
+          ctx.fillStyle = 'rgba(255,255,255,0.3)'
+          const shortPath = item.sourcePath.split(/[\\/]/).pop() || ''
+          ctx.fillText(shortPath, 0, halfH * 0.7)
+        }
       }
 
       ctx.restore()

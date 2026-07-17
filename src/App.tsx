@@ -812,6 +812,15 @@ export default function App() {
         <button className="ymm4-toolbar-btn" onClick={() => handleAddTrack('audio')}>＋ 音声</button>
         <button className="ymm4-toolbar-btn" onClick={() => handleAddTrack('text')}>＋ テキスト</button>
         <div className="ymm4-toolbar-separator" />
+        <div className="ymm4-toolbar-separator" />
+        <button className="ymm4-toolbar-btn" onClick={() => { setCurrentFrame(0); setIsPlaying(false) }} title="先頭に戻る">⏮</button>
+        <button className={`ymm4-toolbar-btn ${isPlaying ? 'active' : ''}`} onClick={() => setIsPlaying(prev => !prev)} title={isPlaying ? '停止' : '再生'}>
+          {isPlaying ? '⏸' : '▶'}
+        </button>
+        <button className="ymm4-toolbar-btn" onClick={() => setCurrentFrame(project.settings.totalFrames - 1)} title="末尾に移動">⏭</button>
+        <span className="ymm4-bottom-bar-item" style={{ fontSize: 12, fontFamily: 'Consolas, monospace', marginLeft: 8 }}>
+          {timeStr}
+        </span>
         <button className={`ymm4-toolbar-btn ${snapFrames > 1 ? 'active' : ''}`} onClick={cycleSnapFrames}>
           🧲 {snapFrames}f
         </button>
@@ -952,30 +961,46 @@ export default function App() {
               onToggleTrackLock={handleToggleTrackLock}
               onToggleTrackSolo={handleToggleTrackSolo}
               onChangeTrackColor={handleChangeTrackColor}
-              onDropMediaItem={(trackIndex, mediaName, mediaType, startFrame) => {
+              onDropMediaItem={(_trackIndex, mediaName, mediaType, startFrame) => {
                 const duration = project.settings.fps * 5
                 const itemType = mediaType === 'audio' ? 'audio' as const : mediaType === 'image' ? 'image' as const : 'video' as const
-                applyProjectUpdate(prev => ({
-                  ...prev,
-                  tracks: prev.tracks.map((t, i) => i !== trackIndex || t.locked ? t : {
-                    ...t,
-                    items: [...t.items, {
+                const clipName = mediaName.replace(/\.[^.]+$/, '')
+                const sourcePath = mediaName.startsWith('http') || mediaName.includes(':\\') ? mediaName : undefined
+                applyProjectUpdate(prev => {
+                  const targetTrackType: TrackType = itemType === 'audio' ? 'audio' : 'video'
+                  let targetIdx = prev.tracks.findIndex(t => t.type === targetTrackType && !t.locked)
+                  if (targetIdx < 0) {
+                    const newTrack = {
                       id: generateId(),
-                      name: mediaName,
-                      type: itemType,
-                      sourcePath: mediaName,
-                      startFrame,
-                      endFrame: startFrame + duration,
-                      layer: 0,
-                      opacity: 1,
-                      volume: 1,
+                      name: targetTrackType === 'video' ? '動画トラック' : '音声トラック',
+                      type: targetTrackType as TrackType,
+                      index: prev.tracks.length,
+                      mute: false, solo: false, locked: false, visible: true, volume: 1.0,
+                      items: [],
+                    }
+                    targetIdx = prev.tracks.length
+                    return { ...prev, tracks: [...prev.tracks, { ...newTrack, items: [{
+                      id: generateId(), name: clipName, type: itemType, sourcePath: sourcePath || mediaName,
+                      startFrame, endFrame: startFrame + duration, layer: 0, opacity: 1, volume: 1,
                       transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
-                      effects: [],
-                      keyframes: [],
-                      color: ['#4fc3f7', '#81c784', '#ffb74d', '#e57373', '#ba68c8'][t.items.length % 5],
-                    }],
-                  }),
-                }))
+                      effects: [], keyframes: [],
+                      color: ['#4fc3f7', '#81c784', '#ffb74d', '#e57373', '#ba68c8'][0],
+                    }] }] }
+                  }
+                  return {
+                    ...prev,
+                    tracks: prev.tracks.map((t, i) => i !== targetIdx ? t : {
+                      ...t,
+                      items: [...t.items, {
+                        id: generateId(), name: clipName, type: itemType, sourcePath: sourcePath || mediaName,
+                        startFrame, endFrame: startFrame + duration, layer: 0, opacity: 1, volume: 1,
+                        transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+                        effects: [], keyframes: [],
+                        color: ['#4fc3f7', '#81c784', '#ffb74d', '#e57373', '#ba68c8'][t.items.length % 5],
+                      }],
+                    }),
+                  }
+                })
               }}
             />
           </div>
@@ -1013,14 +1038,19 @@ export default function App() {
       {/* ボトムバー */}
       <div className="ymm4-bottom-bar">
         <div className="ymm4-bottom-bar-left">
-          <span className="ymm4-bottom-bar-item">
-            ⏵ {currentFrame}
+          <span className="ymm4-bottom-bar-item" style={{ fontFamily: 'Consolas, monospace' }}>
+            f{currentFrame} / {project.settings.totalFrames}
           </span>
-          <span className="ymm4-bottom-bar-item">
-            ⌚ {timeStr}
+          <span className="ymm4-bottom-bar-item" style={{ fontFamily: 'Consolas, monospace' }}>
+            {timeStr}
           </span>
         </div>
         <div className="ymm4-bottom-bar-right">
+          <button className="ymm4-toolbar-btn" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => setCurrentFrame(0)} title="先頭">⏮</button>
+          <button className={`ymm4-toolbar-btn ${isPlaying ? 'active' : ''}`} style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => setIsPlaying(prev => !prev)} title={isPlaying ? '停止' : '再生'}>
+            {isPlaying ? '⏸' : '▶'}
+          </button>
+          <button className="ymm4-toolbar-btn" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => setCurrentFrame(project.settings.totalFrames - 1)} title="末尾">⏭</button>
           <span className="ymm4-bottom-bar-item">
             FPS <span className="ymm4-bottom-bar-value">{project.settings.fps}</span>
           </span>
