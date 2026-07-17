@@ -2,13 +2,10 @@
 // YMM4互換 タイムラインデータモデル
 // ============================================================
 
-/** アイテムの種類 */
 export type ItemType = 'video' | 'audio' | 'image' | 'text' | 'voice' | 'shape'
 
-/** トラックの種類 */
 export type TrackType = 'video' | 'audio' | 'text'
 
-/** 変形情報 */
 export interface Transform {
   x: number
   y: number
@@ -17,7 +14,6 @@ export interface Transform {
   rotation: number
 }
 
-/** エフェクト */
 export interface Effect {
   name: string
   params: Record<string, number | string | boolean>
@@ -25,7 +21,6 @@ export interface Effect {
 
 export type EasingType = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | 'bounce' | 'elastic'
 
-/** キーフレーム */
 export interface Keyframe {
   frame: number
   easing: EasingType
@@ -40,7 +35,6 @@ export interface Keyframe {
   }>
 }
 
-/** タイムライン上のアイテム（クリップ） */
 export interface TimelineItem {
   id: string
   groupId?: string
@@ -60,9 +54,11 @@ export interface TimelineItem {
   color?: string
   appearAnimation?: string
   disappearAnimation?: string
+
+  /** YMM4項目の生データ（ラウンドトリップ保存用） */
+  _rawYmmpItem?: Record<string, unknown>
 }
 
-/** トラック */
 export interface Track {
   id: string
   name: string
@@ -77,7 +73,6 @@ export interface Track {
   color?: string
 }
 
-/** プロジェクト設定 */
 export interface ProjectSettings {
   width: number
   height: number
@@ -87,14 +82,12 @@ export interface ProjectSettings {
   backgroundColor: string
 }
 
-/** シーン */
 export interface Scene {
   id: string
   name: string
   tracks: Track[]
 }
 
-/** プロジェクト全体 */
 export interface Project {
   version: string
   name: string
@@ -102,28 +95,31 @@ export interface Project {
   tracks: Track[]
   scenes: Scene[]
   activeSceneId: string
+
+  /** YMM4プロジェクトの生データ（ラウンドトリップ保存用） */
+  _rawYmmp?: Record<string, unknown>
+  /** YMM4 LayoutXml（ラウンドトリップ保存用） */
+  _layoutXml?: string
+  /** YMM4 ToolStates（ラウンドトリップ保存用） */
+  _toolStates?: Record<string, unknown>
+  /** YMM4 Characters（ラウンドトリップ保存用） */
+  _characters?: unknown[]
+  /** YMM4 CollapsedGroups（ラウンドトリップ保存用） */
+  _collapsedGroups?: Record<string, unknown>
 }
 
-// ============================================================
-// ヘルパー関数
-// ============================================================
-
-/** ユニークID生成 */
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 }
 
-/** フレーム → 秒 */
 export function framesToSeconds(frame: number, fps: number): number {
   return frame / fps
 }
 
-/** 秒 → フレーム */
 export function secondsToFrames(seconds: number, fps: number): number {
   return Math.round(seconds * fps)
 }
 
-/** 時間フォーマット (HH:MM:SS.FF) */
 export function formatTime(frame: number, fps: number): string {
   const totalSeconds = framesToSeconds(frame, fps)
   const h = Math.floor(totalSeconds / 3600)
@@ -133,7 +129,6 @@ export function formatTime(frame: number, fps: number): string {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${f.toString().padStart(2, '0')}`
 }
 
-/** 新規プロジェクトを作成 */
 export function createDefaultProject(): Project {
   const s1Id = generateId()
   const tracks: Track[] = [
@@ -191,18 +186,17 @@ export function createDefaultProject(): Project {
   }
 }
 
-/** サンプルアイテムを追加 */
 export function addSampleItem(project: Project, trackIndex: number): Project {
   const track = project.tracks[trackIndex]
   if (!track) return project
 
   const lastFrame = track.items.reduce((max, item) => Math.max(max, item.endFrame), 0)
-    const item: TimelineItem = {
+  const item: TimelineItem = {
     id: generateId(),
     name: `${track.name} クリップ ${track.items.length + 1}`,
     type: track.type === 'text' ? 'text' : track.type === 'audio' ? 'audio' : 'video',
     startFrame: lastFrame + 30,
-    endFrame: lastFrame + 30 + 150, // 5秒
+    endFrame: lastFrame + 30 + 150,
     layer: 0,
     opacity: 1.0,
     volume: 1.0,
@@ -230,19 +224,16 @@ function getRandomColor(): string {
   return COLORS[Math.floor(Math.random() * COLORS.length)]
 }
 
-/** アクティブシーンのトラックを取得 */
 export function getActiveTracks(project: Project): Track[] {
   const scene = project.scenes.find(s => s.id === project.activeSceneId)
   if (scene) return scene.tracks
   return project.tracks
 }
 
-/** アクティブシーンを取得 */
 export function getActiveScene(project: Project): Scene | null {
   return project.scenes.find(s => s.id === project.activeSceneId) ?? null
 }
 
-/** アクティブシーンのトラックを更新し、project.tracksも同期 */
 export function updateActiveTracks(project: Project, updater: (tracks: Track[]) => Track[]): Project {
   const activeScene = project.scenes.find(s => s.id === project.activeSceneId)
   if (activeScene) {
@@ -256,7 +247,6 @@ export function updateActiveTracks(project: Project, updater: (tracks: Track[]) 
   return { ...project, tracks: updater(project.tracks) }
 }
 
-/** シーンを追加 */
 export function addScene(project: Project, name?: string): Project {
   const sceneTracks = project.tracks.map(t => ({
     ...t,
@@ -275,7 +265,6 @@ export function addScene(project: Project, name?: string): Project {
   }
 }
 
-/** シーンを削除 */
 export function removeScene(project: Project, sceneId: string): Project {
   const remaining = project.scenes.filter(s => s.id !== sceneId)
   if (remaining.length === 0) return project
@@ -289,7 +278,6 @@ export function removeScene(project: Project, sceneId: string): Project {
   }
 }
 
-/** シーン名を変更 */
 export function renameScene(project: Project, sceneId: string, name: string): Project {
   return {
     ...project,
@@ -297,7 +285,6 @@ export function renameScene(project: Project, sceneId: string, name: string): Pr
   }
 }
 
-/** シーンを複製 */
 export function duplicateScene(project: Project, sceneId: string): Project {
   const source = project.scenes.find(s => s.id === sceneId)
   if (!source) return project
@@ -314,7 +301,6 @@ export function duplicateScene(project: Project, sceneId: string): Project {
   }
 }
 
-/** シーンを切り替え */
 export function switchScene(project: Project, sceneId: string): Project {
   if (project.activeSceneId === sceneId) return project
   const target = project.scenes.find(s => s.id === sceneId)
@@ -326,7 +312,6 @@ export function switchScene(project: Project, sceneId: string): Project {
   }
 }
 
-/** トラックを追加 */
 export function addTrack(project: Project, type: TrackType): Project {
   const track: Track = {
     id: generateId(),

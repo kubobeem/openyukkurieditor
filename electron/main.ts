@@ -118,9 +118,13 @@ ipcMain.handle('show-save-dialog', async () => {
   return result
 })
 
+const BOM = '\uFEFF'
+
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   try {
-    return fs.readFileSync(filePath, 'utf-8')
+    let content = fs.readFileSync(filePath, 'utf-8')
+    if (content.startsWith(BOM)) content = content.slice(1)
+    return content
   } catch (e) {
     console.error('Failed to read file:', e)
     return null
