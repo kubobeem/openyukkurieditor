@@ -18,6 +18,14 @@ buildResources/icon*.png
 *.swo
 Thumbs.db
 .DS_Store
+*.suo
+*.vs/
 
 # Temp / garbage
 nul
+*.log
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
