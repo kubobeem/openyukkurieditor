@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, Menu, dialog, ipcMain, protocol } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
@@ -16,6 +16,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false,
+      allowRunningInsecureContent: true,
     },
     show: false,
   })
@@ -97,7 +99,14 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  // mediaプロトコルを特権プロトコルとして登録（セキュリティ制限を緩和）
+  protocol.registerFileProtocol('media', (request, callback) => {
+    const filePath = decodeURIComponent(request.url.replace('media://', ''))
+    callback({ path: filePath })
+  })
+  createWindow()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

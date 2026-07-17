@@ -15,11 +15,17 @@ export class MediaManager {
     return this.audioContext
   }
 
+  private toMediaUrl(src: string): string {
+    if (src.startsWith('media://') || src.startsWith('http://') || src.startsWith('https://')) return src
+    if (src.includes(':\\') || src.startsWith('/')) return `media://${src.replace(/\\/g, '/')}`
+    return src
+  }
+
   async loadAudio(src: string): Promise<AudioBuffer | null> {
     if (this.audioBuffers.has(src)) return this.audioBuffers.get(src)!
     try {
       const ctx = this.getAudioContext()
-      const res = await fetch(src.startsWith('file://') || src.includes(':\\') ? `file://${src}` : src)
+      const res = await fetch(this.toMediaUrl(src))
       if (!res.ok) return null
       const arrayBuffer = await res.arrayBuffer()
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
@@ -61,8 +67,7 @@ export class MediaManager {
       vid.preload = 'auto'
       vid.muted = true
       vid.playsInline = true
-      const source = src.startsWith('file://') || src.startsWith('http') ? src : `file:///${src.replace(/\\/g, '/')}`
-      vid.src = source
+      vid.src = this.toMediaUrl(src)
       vid.load()
       this.videoCache.set(src, vid)
     }
@@ -88,8 +93,7 @@ export class MediaManager {
     if (!img) {
       img = new Image()
       img.crossOrigin = 'anonymous'
-      const source = src.startsWith('file://') || src.startsWith('http') ? src : `file:///${src.replace(/\\/g, '/')}`
-      img.src = source
+      img.src = this.toMediaUrl(src)
       this.imageCache.set(src, img)
     }
     return img
